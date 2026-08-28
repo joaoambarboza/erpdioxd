@@ -1,0 +1,323 @@
+// Prisma schema for the Dioxd ERP Financeiro
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- Auth ----------
+
+enum Role {
+  ADMIN
+  FINANCEIRO
+  LEITURA
+}
+
+model User {
+  id           String              @id @default(cuid())
+  name         String
+  email        String              @unique
+  passwordHash String
+  role         Role                @default(ADMIN)
+  ativo        Boolean             @default(true)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  lancamentos  Lancamento[]
+  fechamentos  FechamentoMensal[]
+  auditLogs    AuditLog[]
+  anexos       Anexo[]
+}
+
+// ---------- Auditoria ----------
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Restrict)
+  userName    String
+  acao        String
+  entidade    String
+  entidadeId  String?
+  detalhes    String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// ---------- Fechamento Mensal ----------
+
+enum StatusFechamento {
+  ABERTO
+  FECHADO
+}
+
+model FechamentoMensal {
+  id           String           @id @default(cuid())
+  ano          Int
+  mes          Int
+  status       StatusFechamento @default(ABERTO)
+  fechadoEm    DateTime?
+  fechadoPorId String?
+  fechadoPor   User?            @relation(fields: [fechadoPorId], references: [id], onDelete: SetNull, onUpdate: Restrict)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@unique([ano, mes])
+}
+
+// ---------- Cadastros ----------
+
+model Regional {
+  id          String       @id @default(cuid())
+  nome        String       @unique
+  ativo       Boolean      @default(true)
+  clientes    Cliente[]
+  lancamentos Lancamento[]
+}
+
+model CentroCusto {
+  id          String       @id @default(cuid())
+  nome        String       @unique
+  ativo       Boolean      @default(true)
+  lancamentos Lancamento[]
+}
+
+enum TipoCategoria {
+  ENTRADA
+  SAIDA
+}
+
+model Categoria {
+  id             String       @id @default(cuid())
+  nome           String
+  tipo           TipoCategoria
+  ativo          Boolean      @default(true)
+  parentId       String?
+  parent         Categoria?   @relation("Subcategorias", fields: [parentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  subcategorias  Categoria[]  @relation("Subcategorias")
+  lancamentos    Lancamento[] @relation("LancamentoCategoria")
+  lancamentosSub Lancamento[] @relation("LancamentoSubcategoria")
+  orcamentos     OrcamentoItem[]
+
+  @@unique([nome, parentId])
+}
+
+// ---------- Orçamento ----------
+
+model OrcamentoItem {
+  id          String    @id @default(cuid())
+  ano         Int
+  mes         Int
+  categoriaId String
+  categoria   Categoria @relation(fields: [categoriaId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  valorOrcado Decimal   @db.Decimal(14, 2)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([ano, mes, categoriaId])
+}
+
+model GrupoDRE {
+  id     String     @id @default(cuid())
+  nome   String     @unique
+  ordem  Int
+  contas ContaDRE[]
+}
+
+model ContaDRE {
+  id          String       @id @default(cuid())
+  nome        String
+  ordem       Int
+  grupoId     String
+  grupo       GrupoDRE     @relation(fields: [grupoId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  lancamentos Lancamento[]
+
+  @@unique([nome, grupoId])
+}
+
+model ContaBancaria {
+  id           String       @id @default(cuid())
+  nome         String       @unique
+  banco        String
+  saldoInicial Decimal      @default(0) @db.Decimal(14, 2)
+  ativo        Boolean      @default(true)
+  lancamentos  Lancamento[]
+}
+
+model Cliente {
+  id          String       @id @default(cuid())
+  nome        String
+  documento   String?
+  contato     String?
+  ativo       Boolean      @default(true)
+  regionalId  String?
+  regional    Regional?    @relation(fields: [regionalId], references: [id], onDelete: SetNull, onUpdate: Restrict)
+  lancamentos Lancamento[]
+}
+
+model Fornecedor {
+  id          String       @id @default(cuid())
+  nome        String
+  documento   String?
+  contato     String?
+  ativo       Boolean      @default(true)
+  lancamentos Lancamento[]
+}
+
+// ---------- Lançamentos ----------
+
+enum TipoLancamento {
+  ENTRADA
+  SAIDA
+}
+
+enum NaturezaLancamento {
+  RECEITA
+  CUSTO
+  DESPESA
+  TRANSFERENCIA
+  INVESTIMENTO
+  EMPRESTIMO
+  FINANCIAMENTO
+  IMPOSTO
+  OUTROS
+}
+
+enum StatusLancamento {
+  PROJETADO
+  EM_ABERTO
+  PAGO
+  RECEBIDO
+  VENCIDO
+  CANCELADO
+  PARCIAL_PAGO
+  PARCIAL_RECEBIDO
+}
+
+enum FormaPagamento {
+  DINHEIRO
+  BOLETO
+  PIX
+  TED
+  CARTAO
+  CHEQUE
+  OUTRO
+}
+
+enum FrequenciaRecorrencia {
+  SEMANAL
+  QUINZENAL
+  MENSAL
+}
+
+model Recorrencia {
+  id          String                @id @default(cuid())
+  frequencia  FrequenciaRecorrencia
+  dataInicio  DateTime
+  dataFim     DateTime?
+  parcelas    Int?
+  createdAt   DateTime              @default(now())
+  lancamentos Lancamento[]
+}
+
+model Lancamento {
+  id String @id @default(cuid())
+
+  // Identificação
+  dataLancamento DateTime
+  dataCompetencia DateTime
+  dataVencimento DateTime
+  dataPagamento  DateTime?
+  tipo           TipoLancamento
+  natureza       NaturezaLancamento
+  status         StatusLancamento @default(EM_ABERTO)
+  descricao      String
+
+  // Valores
+  valorOriginal Decimal @db.Decimal(14, 2)
+  desconto      Decimal @default(0) @db.Decimal(14, 2)
+  acrescimo     Decimal @default(0) @db.Decimal(14, 2)
+  juros         Decimal @default(0) @db.Decimal(14, 2)
+  multa         Decimal @default(0) @db.Decimal(14, 2)
+  valorFinal    Decimal @db.Decimal(14, 2)
+  valorPago     Decimal @default(0) @db.Decimal(14, 2)
+  saldoAberto   Decimal @db.Decimal(14, 2)
+
+  // Classificação
+  categoriaId     String
+  categoria       Categoria      @relation("LancamentoCategoria", fields: [categoriaId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  subcategoriaId  String?
+  subcategoria    Categoria?     @relation("LancamentoSubcategoria", fields: [subcategoriaId], references: [id], onDelete: SetNull, onUpdate: Restrict)
+  contaDreId      String
+  contaDre        ContaDRE       @relation(fields: [contaDreId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  centroCustoId   String
+  centroCusto     CentroCusto    @relation(fields: [centroCustoId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  regionalId      String
+  regional        Regional       @relation(fields: [regionalId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  projeto         String?
+  contaBancariaId String
+  contaBancaria   ContaBancaria  @relation(fields: [contaBancariaId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  clienteId       String?
+  cliente         Cliente?       @relation(fields: [clienteId], references: [id], onDelete: SetNull, onUpdate: Restrict)
+  fornecedorId    String?
+  fornecedor      Fornecedor?    @relation(fields: [fornecedorId], references: [id], onDelete: SetNull, onUpdate: Restrict)
+  formaPagamento  FormaPagamento
+  tipoPagamento   String?
+
+  // Observações
+  observacao        String?
+  numeroDocumento   String?
+  numeroNotaFiscal  String?
+
+  // Recorrência
+  recorrenciaId String?
+  recorrencia   Recorrencia? @relation(fields: [recorrenciaId], references: [id], onDelete: SetNull, onUpdate: Restrict)
+
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  anexos Anexo[]
+
+  @@index([tipo, status])
+  @@index([dataCompetencia])
+  @@index([dataVencimento])
+  @@index([regionalId])
+  @@index([centroCustoId])
+  @@index([categoriaId])
+}
+
+// ---------- Anexos ----------
+
+model Anexo {
+  id              String     @id @default(cuid())
+  lancamentoId    String
+  lancamento      Lancamento @relation(fields: [lancamentoId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  nomeArquivo     String
+  caminhoArquivo  String
+  tamanho         Int
+  tipoMime        String
+  uploadedById    String?
+  uploadedBy      User?      @relation(fields: [uploadedById], references: [id], onDelete: SetNull, onUpdate: Restrict)
+  createdAt       DateTime   @default(now())
+
+  @@index([lancamentoId])
+}
+
+// ---------- Configurações ----------
+
+model ConfiguracaoEmpresa {
+  id                 String   @id
+  nome               String   @default("Dioxd")
+  cnpj               String?
+  endereco           String?
+  logoPath           String?
+  mesInicioAnoFiscal Int      @default(1)
+  updatedAt          DateTime @updatedAt
+}

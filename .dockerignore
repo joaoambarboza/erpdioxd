@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+.claude
+storage
+*.log
+.env
+.env.*
+!.env.production.example
+.DS_Store
+tsconfig.tsbuildinfo
