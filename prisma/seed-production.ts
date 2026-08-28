@@ -47,7 +47,7 @@ async function main() {
       },
     });
     console.log(
-      "Conta bancária inicial criada (edite nome/banco/saldo direto no banco até existir uma tela de cadastro)."
+      "Conta bancária inicial criada (edite nome/banco/saldo em Cadastros > Contas Bancárias)."
     );
   } else {
     console.log("Conta bancária já existe, nada a fazer.");
