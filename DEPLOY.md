@@ -43,9 +43,15 @@ curl -fsSL https://get.docker.com | sh
 **Opção rápida — copiar direto do seu Mac** (sem precisar de GitHub agora):
 
 ```bash
-rsync -av --exclude node_modules --exclude .next --exclude storage --exclude .git \
+rsync -av --exclude node_modules --exclude .next --exclude storage --exclude .git --exclude .env \
   "/Users/joaob/Desktop/ERP IA/" root@SEU-IP:/root/dioxd-erp/
 ```
+
+> **Atenção:** o `--exclude .env` é essencial. Sem ele, esse comando
+> sobrescreve o `.env` de produção na VPS com o `.env` local de
+> desenvolvimento (senha do Postgres, `AUTH_SECRET` e `DOMAIN` errados),
+> deixando os containers incapazes de reiniciar corretamente até o
+> arquivo ser corrigido manualmente na VPS.
 
 ## 5. Configurar variáveis de ambiente
 
