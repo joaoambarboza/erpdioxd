@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { getSaldoAtual, getFluxoMensal } from "@/lib/financials";
+import { getLogoForExcel } from "@/lib/configuracao";
 import { buildXlsxResponse, type ExcelColumn } from "@/lib/excel";
 
 const columns: ExcelColumn[] = [
@@ -25,5 +26,6 @@ export async function GET() {
     saldoFinal: m.saldoFinal,
   }));
 
-  return buildXlsxResponse("fluxo-de-caixa.xlsx", "Fluxo de Caixa", columns, rows);
+  const logo = await getLogoForExcel();
+  return buildXlsxResponse("fluxo-de-caixa.xlsx", "Fluxo de Caixa", columns, rows, { logo: logo ?? undefined });
 }

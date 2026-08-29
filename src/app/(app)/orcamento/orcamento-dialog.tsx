@@ -4,7 +4,8 @@ import * as React from "react";
 import { useActionState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { FieldGroup, Input } from "@/components/ui/field";
+import { FieldGroup } from "@/components/ui/field";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { setOrcamento, type ActionState } from "./actions";
 
 const initialState: ActionState = {};
@@ -45,16 +46,7 @@ export function OrcamentoDialog({
         <input type="hidden" name="categoriaId" value={categoriaId} />
 
         <FieldGroup label="Valor orçado" htmlFor="valorOrcado">
-          <Input
-            id="valorOrcado"
-            name="valorOrcado"
-            type="number"
-            step="0.01"
-            min="0"
-            required
-            defaultValue={valorAtual || undefined}
-            autoFocus
-          />
+          <CurrencyInput id="valorOrcado" name="valorOrcado" defaultValue={valorAtual || 0} autoFocus />
         </FieldGroup>
 
         {state.error && (

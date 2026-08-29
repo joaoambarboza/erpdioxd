@@ -29,8 +29,20 @@ export default async function PlanoDeContasPage() {
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-foreground">
                 {grupo.ordem}. {grupo.nome}
+                {grupo.subtotalLabel && (
+                  <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                    = {grupo.subtotalLabel}
+                    {grupo.mostrarPercentual && " (%)"}
+                  </span>
+                )}
               </h2>
-              <GrupoRowActions id={grupo.id} nome={grupo.nome} ordem={grupo.ordem} />
+              <GrupoRowActions
+                id={grupo.id}
+                nome={grupo.nome}
+                ordem={grupo.ordem}
+                subtotalLabel={grupo.subtotalLabel}
+                mostrarPercentual={grupo.mostrarPercentual}
+              />
             </div>
             <div className="overflow-x-auto rounded-xl border border-border bg-surface">
               <table className="w-full text-sm">
@@ -38,6 +50,7 @@ export default async function PlanoDeContasPage() {
                   <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
                     <th className="px-4 py-3 font-medium">Ordem</th>
                     <th className="px-4 py-3 font-medium">Conta</th>
+                    <th className="px-4 py-3 font-medium">Regime</th>
                     <th className="px-4 py-3" />
                   </tr>
                 </thead>
@@ -46,12 +59,16 @@ export default async function PlanoDeContasPage() {
                     <tr key={conta.id} className="border-b border-border last:border-0 hover:bg-background/50">
                       <td className="px-4 py-3 text-muted">{conta.ordem}</td>
                       <td className="px-4 py-3">{conta.nome}</td>
+                      <td className="px-4 py-3 text-muted">
+                        {conta.regime === "CAIXA" ? "Caixa" : "Competência"}
+                      </td>
                       <td className="px-4 py-3">
                         <ContaRowActions
                           id={conta.id}
                           nome={conta.nome}
                           ordem={conta.ordem}
                           grupoId={conta.grupoId}
+                          regime={conta.regime}
                           grupos={gruposOptions}
                         />
                       </td>
@@ -59,7 +76,7 @@ export default async function PlanoDeContasPage() {
                   ))}
                   {grupo.contas.length === 0 && (
                     <tr>
-                      <td colSpan={3} className="px-4 py-6 text-center text-muted">
+                      <td colSpan={4} className="px-4 py-6 text-center text-muted">
                         Nenhuma conta neste grupo.
                       </td>
                     </tr>

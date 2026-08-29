@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
-import { PeriodFilterBar } from "@/components/filters/period-filter-bar";
 import { toNum } from "@/lib/financials";
 import { getConfiguracao } from "@/lib/configuracao";
+import { OrcamentoFilterBar } from "./orcamento-filter-bar";
 import { OrcamentoTable, type OrcamentoRow } from "./orcamento-table";
 
 export default async function OrcamentoPage({
@@ -13,25 +13,49 @@ export default async function OrcamentoPage({
   const now = new Date();
   const configuracao = await getConfiguracao();
   const ano = typeof params.ano === "string" && params.ano ? Number(params.ano) : now.getUTCFullYear();
-  const mes = typeof params.mes === "string" && params.mes ? Number(params.mes) : now.getUTCMonth() + 1;
 
-  const periodStart = new Date(Date.UTC(ano, mes - 1, 1));
-  const periodEnd = new Date(Date.UTC(ano, mes, 1));
+  const mesesSelecionados = (typeof params.meses === "string" ? params.meses : "")
+    .split(",")
+    .filter(Boolean)
+    .map(Number)
+    .filter((m) => m >= 1 && m <= 12)
+    .sort((a, b) => a - b);
+  // "todos" (nenhum mês selecionado) soma o ano inteiro, em vez de cair
+  // silenciosamente no mês atual como acontecia antes.
+  const mesesParaSomar = mesesSelecionados.length > 0 ? mesesSelecionados : Array.from({ length: 12 }, (_, i) => i + 1);
+  const editavel = mesesSelecionados.length === 1;
+  const mesParaEdicao = editavel ? mesesSelecionados[0] : now.getUTCMonth() + 1;
 
-  const [categorias, orcamentos, realizadoPorCategoria, regionais, centrosCusto] = await Promise.all([
+  const [categorias, orcamentos, realizadoPorMes, regionais, centrosCusto] = await Promise.all([
     prisma.categoria.findMany({ orderBy: { nome: "asc" } }),
-    prisma.orcamentoItem.findMany({ where: { ano, mes } }),
-    prisma.lancamento.groupBy({
-      by: ["categoriaId"],
-      _sum: { valorFinal: true },
-      where: { status: { not: "CANCELADO" }, dataCompetencia: { gte: periodStart, lt: periodEnd } },
-    }),
+    prisma.orcamentoItem.findMany({ where: { ano, mes: { in: mesesParaSomar } } }),
+    Promise.all(
+      mesesParaSomar.map((mes) =>
+        prisma.lancamento.groupBy({
+          by: ["categoriaId"],
+          _sum: { valorFinal: true },
+          where: {
+            status: { not: "CANCELADO" },
+            dataCompetencia: { gte: new Date(Date.UTC(ano, mes - 1, 1)), lt: new Date(Date.UTC(ano, mes, 1)) },
+          },
+        })
+      )
+    ),
     prisma.regional.findMany({ where: { ativo: true }, orderBy: { nome: "asc" } }),
     prisma.centroCusto.findMany({ where: { ativo: true }, orderBy: { nome: "asc" } }),
   ]);
 
-  const orcamentoMap = new Map(orcamentos.map((o) => [o.categoriaId, o]));
-  const realizadoMap = new Map(realizadoPorCategoria.map((r) => [r.categoriaId, toNum(r._sum.valorFinal)]));
+  const orcamentoSomaMap = new Map<string, number>();
+  const orcamentoIdMap = new Map<string, string>();
+  for (const o of orcamentos) {
+    orcamentoSomaMap.set(o.categoriaId, (orcamentoSomaMap.get(o.categoriaId) ?? 0) + toNum(o.valorOrcado));
+    orcamentoIdMap.set(o.categoriaId, o.id);
+  }
+
+  const realizadoMap = new Map<string, number>();
+  for (const r of realizadoPorMes.flat()) {
+    realizadoMap.set(r.categoriaId, (realizadoMap.get(r.categoriaId) ?? 0) + toNum(r._sum.valorFinal));
+  }
 
   // Lançamentos referenciam a categoria específica escolhida (raiz ou
   // subcategoria) — a árvore inteira é listada para que o Realizado apareça
@@ -41,8 +65,8 @@ export default async function OrcamentoPage({
     categoriaId: c.id,
     categoriaNome: indent ? `↳ ${c.nome}` : c.nome,
     tipo: c.tipo,
-    orcamentoId: orcamentoMap.get(c.id)?.id ?? null,
-    orcado: toNum(orcamentoMap.get(c.id)?.valorOrcado),
+    orcamentoId: editavel ? (orcamentoIdMap.get(c.id) ?? null) : null,
+    orcado: orcamentoSomaMap.get(c.id) ?? 0,
     realizado: realizadoMap.get(c.id) ?? 0,
   });
   const rows: OrcamentoRow[] = raizes.flatMap((raiz) => [
@@ -59,14 +83,14 @@ export default async function OrcamentoPage({
         <p className="text-sm text-muted">Defina metas por categoria e acompanhe o realizado</p>
       </div>
 
-      <PeriodFilterBar
+      <OrcamentoFilterBar
         regionais={regionais}
         centrosCusto={centrosCusto}
         years={years}
         mesInicioAnoFiscal={configuracao.mesInicioAnoFiscal}
       />
 
-      <OrcamentoTable ano={ano} mes={mes} rows={rows} />
+      <OrcamentoTable ano={ano} mes={mesParaEdicao} editavel={editavel} rows={rows} />
     </div>
   );
 }

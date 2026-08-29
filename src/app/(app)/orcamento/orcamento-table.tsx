@@ -15,7 +15,17 @@ export type OrcamentoRow = {
   realizado: number;
 };
 
-export function OrcamentoTable({ ano, mes, rows }: { ano: number; mes: number; rows: OrcamentoRow[] }) {
+export function OrcamentoTable({
+  ano,
+  mes,
+  editavel,
+  rows,
+}: {
+  ano: number;
+  mes: number;
+  editavel: boolean;
+  rows: OrcamentoRow[];
+}) {
   const [selected, setSelected] = React.useState<OrcamentoRow | null>(null);
   const [isPending, startTransition] = React.useTransition();
 
@@ -51,31 +61,35 @@ export function OrcamentoTable({ ano, mes, rows }: { ano: number; mes: number; r
                     {row.orcado > 0 ? formatCurrency(desvio) : "—"}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        type="button"
-                        className="rounded-md p-1.5 text-muted hover:bg-background hover:text-foreground"
-                        aria-label="Definir orçamento"
-                        onClick={() => setSelected(row)}
-                      >
-                        <Pencil size={16} />
-                      </button>
-                      {row.orcamentoId && (
+                    {editavel ? (
+                      <div className="flex items-center justify-end gap-1">
                         <button
                           type="button"
-                          disabled={isPending}
-                          className="rounded-md p-1.5 text-muted hover:bg-saida-bg hover:text-saida disabled:opacity-50"
-                          aria-label="Remover orçamento"
-                          onClick={() => {
-                            startTransition(() => {
-                              deleteOrcamento(row.orcamentoId!);
-                            });
-                          }}
+                          className="rounded-md p-1.5 text-muted hover:bg-background hover:text-foreground"
+                          aria-label="Definir orçamento"
+                          onClick={() => setSelected(row)}
                         >
-                          <Trash2 size={16} />
+                          <Pencil size={16} />
                         </button>
-                      )}
-                    </div>
+                        {row.orcamentoId && (
+                          <button
+                            type="button"
+                            disabled={isPending}
+                            className="rounded-md p-1.5 text-muted hover:bg-saida-bg hover:text-saida disabled:opacity-50"
+                            aria-label="Remover orçamento"
+                            onClick={() => {
+                              startTransition(() => {
+                                deleteOrcamento(row.orcamentoId!);
+                              });
+                            }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="block text-right text-xs text-muted">soma do período</span>
+                    )}
                   </td>
                 </tr>
               );

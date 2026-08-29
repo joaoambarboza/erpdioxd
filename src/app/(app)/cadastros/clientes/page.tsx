@@ -27,6 +27,7 @@ export default async function ClientesPage() {
             <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
               <th className="px-4 py-3 font-medium">Nome</th>
               <th className="px-4 py-3 font-medium">Documento</th>
+              <th className="px-4 py-3 font-medium">Telefone</th>
               <th className="px-4 py-3 font-medium">Regional</th>
               <th className="px-4 py-3 font-medium">Contato</th>
               <th className="px-4 py-3 font-medium">Status</th>
@@ -38,6 +39,7 @@ export default async function ClientesPage() {
               <tr key={c.id} className="border-b border-border last:border-0 hover:bg-background/50">
                 <td className="px-4 py-3">{c.nome}</td>
                 <td className="px-4 py-3 text-muted">{c.documento ?? "—"}</td>
+                <td className="px-4 py-3 text-muted">{c.telefone ?? "—"}</td>
                 <td className="px-4 py-3 text-muted">{c.regional?.nome ?? "—"}</td>
                 <td className="px-4 py-3 text-muted">{c.contato ?? "—"}</td>
                 <td className="px-4 py-3">
@@ -49,6 +51,7 @@ export default async function ClientesPage() {
                       id: c.id,
                       nome: c.nome,
                       documento: c.documento,
+                      telefone: c.telefone,
                       contato: c.contato,
                       regionalId: c.regionalId,
                       ativo: c.ativo,
@@ -60,7 +63,7 @@ export default async function ClientesPage() {
             ))}
             {clientes.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-muted">
+                <td colSpan={7} className="px-4 py-10 text-center text-muted">
                   Nenhum cliente cadastrado.
                 </td>
               </tr>

@@ -16,7 +16,13 @@ export function ContaDialog({
   trigger,
 }: {
   grupos: { id: string; nome: string }[];
-  initial?: { id: string; nome: string; ordem: number; grupoId: string };
+  initial?: {
+    id: string;
+    nome: string;
+    ordem: number;
+    grupoId: string;
+    regime: "CAIXA" | "COMPETENCIA";
+  };
   trigger?: React.ReactNode;
 }) {
   const [open, setOpen] = React.useState(false);
@@ -63,6 +69,16 @@ export function ContaDialog({
               <Input id="ordem" name="ordem" type="number" min="0" defaultValue={initial?.ordem ?? 0} />
             </FieldGroup>
           </div>
+          <FieldGroup label="Regime" htmlFor="regime">
+            <Select id="regime" name="regime" defaultValue={initial?.regime ?? "COMPETENCIA"}>
+              <option value="COMPETENCIA">Competência</option>
+              <option value="CAIXA">Caixa</option>
+            </Select>
+          </FieldGroup>
+          <p className="-mt-2 text-xs text-muted">
+            Competência conta pela data da venda/despesa; caixa conta só quando o
+            valor efetivamente entra ou sai (data de pagamento).
+          </p>
 
           {state.error && (
             <p className="rounded-md bg-saida-bg px-3 py-2 text-sm text-saida">{state.error}</p>

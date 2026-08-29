@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Dioxd ERP Financeiro",
-  description: "ERP financeiro da Dioxd",
+  title: "Dioxd Financeiro",
+  description: "Dioxd Financeiro — ERP financeiro da Dioxd",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

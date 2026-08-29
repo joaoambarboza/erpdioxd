@@ -22,6 +22,7 @@ export default async function FornecedoresPage() {
             <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
               <th className="px-4 py-3 font-medium">Nome</th>
               <th className="px-4 py-3 font-medium">Documento</th>
+              <th className="px-4 py-3 font-medium">Telefone</th>
               <th className="px-4 py-3 font-medium">Contato</th>
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3" />
@@ -32,6 +33,7 @@ export default async function FornecedoresPage() {
               <tr key={f.id} className="border-b border-border last:border-0 hover:bg-background/50">
                 <td className="px-4 py-3">{f.nome}</td>
                 <td className="px-4 py-3 text-muted">{f.documento ?? "—"}</td>
+                <td className="px-4 py-3 text-muted">{f.telefone ?? "—"}</td>
                 <td className="px-4 py-3 text-muted">{f.contato ?? "—"}</td>
                 <td className="px-4 py-3">
                   <AtivoBadge ativo={f.ativo} />
@@ -43,7 +45,7 @@ export default async function FornecedoresPage() {
             ))}
             {fornecedores.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-muted">
+                <td colSpan={6} className="px-4 py-10 text-center text-muted">
                   Nenhum fornecedor cadastrado.
                 </td>
               </tr>

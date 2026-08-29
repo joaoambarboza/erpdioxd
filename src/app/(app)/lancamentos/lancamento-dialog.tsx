@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { FieldGroup, Input, Select, Textarea } from "@/components/ui/field";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import {
   tipoLabels,
   naturezaLabels,
@@ -14,6 +15,7 @@ import {
 } from "@/lib/enum-labels";
 import { createLancamento, updateLancamento, type ActionState } from "./actions";
 import { AnexosSection } from "./anexos-section";
+import { X } from "lucide-react";
 
 type Option = { id: string; nome: string };
 
@@ -88,6 +90,16 @@ export function LancamentoDialog({
   const [categoriaId, setCategoriaId] = React.useState(
     initial?.categoriaId ?? ""
   );
+  const [novosAnexos, setNovosAnexos] = React.useState<File[]>([]);
+  const novosAnexosInputRef = React.useRef<HTMLInputElement>(null);
+
+  function syncNovosAnexosInput(files: File[]) {
+    const dt = new DataTransfer();
+    files.forEach((f) => dt.items.add(f));
+    if (novosAnexosInputRef.current) {
+      novosAnexosInputRef.current.files = dt.files;
+    }
+  }
 
   const wasPending = React.useRef(false);
   React.useEffect(() => {
@@ -156,7 +168,7 @@ export function LancamentoDialog({
                   defaultValue={toDateInput(initial?.dataVencimento ?? null) || new Date().toISOString().slice(0, 10)}
                 />
               </FieldGroup>
-              <FieldGroup label="Data de pagamento/recebimento" htmlFor="dataPagamento">
+              <FieldGroup label="Pagamento/recebimento" htmlFor="dataPagamento">
                 <Input
                   id="dataPagamento"
                   name="dataPagamento"
@@ -219,33 +231,25 @@ export function LancamentoDialog({
             <h3 className="mb-3 text-sm font-semibold text-muted">Valores</h3>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
               <FieldGroup label="Valor original" htmlFor="valorOriginal">
-                <Input
-                  id="valorOriginal"
-                  name="valorOriginal"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  required
-                  defaultValue={initial?.valorOriginal}
-                />
+                <CurrencyInput id="valorOriginal" name="valorOriginal" defaultValue={initial?.valorOriginal} />
                 {fieldError("valorOriginal") && (
                   <p className="text-xs text-saida">{fieldError("valorOriginal")}</p>
                 )}
               </FieldGroup>
               <FieldGroup label="Desconto" htmlFor="desconto">
-                <Input id="desconto" name="desconto" type="number" step="0.01" min="0" defaultValue={initial?.desconto ?? "0"} />
+                <CurrencyInput id="desconto" name="desconto" defaultValue={initial?.desconto ?? "0"} />
               </FieldGroup>
               <FieldGroup label="Acréscimo" htmlFor="acrescimo">
-                <Input id="acrescimo" name="acrescimo" type="number" step="0.01" min="0" defaultValue={initial?.acrescimo ?? "0"} />
+                <CurrencyInput id="acrescimo" name="acrescimo" defaultValue={initial?.acrescimo ?? "0"} />
               </FieldGroup>
               <FieldGroup label="Juros" htmlFor="juros">
-                <Input id="juros" name="juros" type="number" step="0.01" min="0" defaultValue={initial?.juros ?? "0"} />
+                <CurrencyInput id="juros" name="juros" defaultValue={initial?.juros ?? "0"} />
               </FieldGroup>
               <FieldGroup label="Multa" htmlFor="multa">
-                <Input id="multa" name="multa" type="number" step="0.01" min="0" defaultValue={initial?.multa ?? "0"} />
+                <CurrencyInput id="multa" name="multa" defaultValue={initial?.multa ?? "0"} />
               </FieldGroup>
-              <FieldGroup label="Valor pago/recebido" htmlFor="valorPago">
-                <Input id="valorPago" name="valorPago" type="number" step="0.01" min="0" defaultValue={initial?.valorPago ?? "0"} />
+              <FieldGroup label="Pago/recebido" htmlFor="valorPago">
+                <CurrencyInput id="valorPago" name="valorPago" defaultValue={initial?.valorPago ?? "0"} />
               </FieldGroup>
             </div>
           </section>
@@ -376,6 +380,54 @@ export function LancamentoDialog({
             </div>
           </section>
 
+          {!isEdit && (
+            <section>
+              <h3 className="mb-3 text-sm font-semibold text-muted">Anexos</h3>
+              {novosAnexos.length > 0 && (
+                <ul className="mb-3 flex flex-col gap-2">
+                  {novosAnexos.map((file, i) => (
+                    <li
+                      key={`${file.name}-${i}`}
+                      className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm"
+                    >
+                      <span className="truncate">{file.name}</span>
+                      <button
+                        type="button"
+                        className="rounded-md p-1.5 text-muted hover:bg-saida-bg hover:text-saida"
+                        aria-label="Remover"
+                        onClick={() => {
+                          const next = novosAnexos.filter((_, idx) => idx !== i);
+                          setNovosAnexos(next);
+                          syncNovosAnexosInput(next);
+                        }}
+                      >
+                        <X size={16} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <input
+                ref={novosAnexosInputRef}
+                type="file"
+                name="anexosNovos"
+                multiple
+                accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"
+                onChange={(e) => {
+                  const added = Array.from(e.target.files ?? []);
+                  if (added.length === 0) return;
+                  const next = [...novosAnexos, ...added];
+                  setNovosAnexos(next);
+                  syncNovosAnexosInput(next);
+                }}
+                className="flex-1 text-sm text-foreground file:mr-3 file:rounded-md file:border file:border-border file:bg-surface file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground"
+              />
+              <p className="mt-1 text-xs text-muted">
+                PDF, imagem ou documento do Office. Máximo 10MB cada — anexados ao salvar.
+              </p>
+            </section>
+          )}
+
           {state.error && (
             <p className="rounded-md bg-saida-bg px-3 py-2 text-sm text-saida">
               {state.error}
@@ -392,9 +444,11 @@ export function LancamentoDialog({
           </div>
         </form>
 
-        <div className="mt-6 border-t border-border pt-6">
-          <AnexosSection lancamentoId={initial?.id ?? null} anexos={initial?.anexos ?? []} />
-        </div>
+        {isEdit && (
+          <div className="mt-6 border-t border-border pt-6">
+            <AnexosSection lancamentoId={initial!.id} anexos={initial?.anexos ?? []} />
+          </div>
+        )}
       </Modal>
     </>
   );

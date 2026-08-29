@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { FieldGroup, Input, Checkbox } from "@/components/ui/field";
+import { DocumentoInput, TelefoneInput } from "@/components/ui/masked-input";
 import { createFornecedor, updateFornecedor, type ActionState } from "./actions";
 
 const initialState: ActionState = {};
@@ -14,6 +15,7 @@ export type FornecedorInitial = {
   id: string;
   nome: string;
   documento: string | null;
+  telefone: string | null;
   contato: string | null;
   ativo: boolean;
 };
@@ -56,12 +58,15 @@ export function FornecedorDialog({
           </FieldGroup>
           <div className="grid grid-cols-2 gap-4">
             <FieldGroup label="Documento (CNPJ/CPF)" htmlFor="documento">
-              <Input id="documento" name="documento" defaultValue={initial?.documento ?? ""} />
+              <DocumentoInput id="documento" name="documento" defaultValue={initial?.documento} />
             </FieldGroup>
-            <FieldGroup label="Contato" htmlFor="contato">
-              <Input id="contato" name="contato" defaultValue={initial?.contato ?? ""} placeholder="Telefone ou e-mail" />
+            <FieldGroup label="Telefone" htmlFor="telefone">
+              <TelefoneInput id="telefone" name="telefone" defaultValue={initial?.telefone} />
             </FieldGroup>
           </div>
+          <FieldGroup label="E-mail / outro contato" htmlFor="contato">
+            <Input id="contato" name="contato" defaultValue={initial?.contato ?? ""} placeholder="voce@exemplo.com" />
+          </FieldGroup>
           <Checkbox name="ativo" defaultChecked={initial?.ativo ?? true} label="Ativo" />
 
           {state.error && (

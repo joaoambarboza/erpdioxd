@@ -10,6 +10,7 @@ export type ActionState = { error?: string };
 const schema = z.object({
   nome: z.string().min(1, "Obrigatório"),
   documento: z.string().optional(),
+  telefone: z.string().optional(),
   contato: z.string().optional(),
   ativo: z.coerce.boolean(),
 });
@@ -18,6 +19,7 @@ function parseForm(formData: FormData) {
   return schema.safeParse({
     nome: formData.get("nome"),
     documento: formData.get("documento") || undefined,
+    telefone: formData.get("telefone") || undefined,
     contato: formData.get("contato") || undefined,
     ativo: formData.get("ativo") === "on",
   });

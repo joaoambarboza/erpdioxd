@@ -11,12 +11,16 @@ export type ActionState = { error?: string };
 const grupoSchema = z.object({
   nome: z.string().min(1, "Obrigatório"),
   ordem: z.coerce.number().int().min(0),
+  subtotalLabel: z.string().optional(),
+  mostrarPercentual: z.coerce.boolean(),
 });
 
 function parseGrupoForm(formData: FormData) {
   return grupoSchema.safeParse({
     nome: formData.get("nome"),
     ordem: formData.get("ordem") || 0,
+    subtotalLabel: formData.get("subtotalLabel") || undefined,
+    mostrarPercentual: formData.get("mostrarPercentual") === "on",
   });
 }
 
@@ -70,6 +74,7 @@ const contaSchema = z.object({
   nome: z.string().min(1, "Obrigatório"),
   ordem: z.coerce.number().int().min(0),
   grupoId: z.string().min(1, "Obrigatório"),
+  regime: z.enum(["CAIXA", "COMPETENCIA"]),
 });
 
 function parseContaForm(formData: FormData) {
@@ -77,6 +82,7 @@ function parseContaForm(formData: FormData) {
     nome: formData.get("nome"),
     ordem: formData.get("ordem") || 0,
     grupoId: formData.get("grupoId"),
+    regime: formData.get("regime") || "COMPETENCIA",
   });
 }
 

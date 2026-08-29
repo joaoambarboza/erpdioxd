@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getLogoForExcel } from "@/lib/configuracao";
 import { buildXlsxResponse, type ExcelColumn } from "@/lib/excel";
 import { formatDate } from "@/lib/utils";
 import { statusLabels } from "@/lib/enum-labels";
@@ -8,6 +9,8 @@ const columns: ExcelColumn[] = [
   { header: "Vencimento", key: "vencimento", width: 14 },
   { header: "Descrição", key: "descricao", width: 32 },
   { header: "Fornecedor", key: "fornecedor", width: 28 },
+  { header: "Documento", key: "documento", width: 20 },
+  { header: "Telefone", key: "telefone", width: 16 },
   { header: "Status", key: "status", width: 18 },
   { header: "Saldo Aberto", key: "saldoAberto", width: 16, currency: true },
 ];
@@ -26,9 +29,12 @@ export async function GET() {
     vencimento: formatDate(l.dataVencimento),
     descricao: l.descricao,
     fornecedor: l.fornecedor?.nome ?? "",
+    documento: l.fornecedor?.documento ?? "",
+    telefone: l.fornecedor?.telefone ?? "",
     status: statusLabels[l.status],
     saldoAberto: Number(l.saldoAberto.toString()),
   }));
 
-  return buildXlsxResponse("contas-a-pagar.xlsx", "Contas a Pagar", columns, rows);
+  const logo = await getLogoForExcel();
+  return buildXlsxResponse("contas-a-pagar.xlsx", "Contas a Pagar", columns, rows, { logo: logo ?? undefined });
 }

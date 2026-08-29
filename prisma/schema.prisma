@@ -19,14 +19,14 @@ enum Role {
 }
 
 model User {
-  id           String              @id @default(cuid())
+  id           String             @id @default(cuid())
   name         String
-  email        String              @unique
+  email        String             @unique
   passwordHash String
-  role         Role                @default(ADMIN)
-  ativo        Boolean             @default(true)
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
+  role         Role               @default(ADMIN)
+  ativo        Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
   lancamentos  Lancamento[]
   fechamentos  FechamentoMensal[]
   auditLogs    AuditLog[]
@@ -36,15 +36,15 @@ model User {
 // ---------- Auditoria ----------
 
 model AuditLog {
-  id          String   @id @default(cuid())
-  userId      String?
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Restrict)
-  userName    String
-  acao        String
-  entidade    String
-  entidadeId  String?
-  detalhes    String?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Restrict)
+  userName   String
+  acao       String
+  entidade   String
+  entidadeId String?
+  detalhes   String?
+  createdAt  DateTime @default(now())
 
   @@index([createdAt])
 }
@@ -93,15 +93,15 @@ enum TipoCategoria {
 }
 
 model Categoria {
-  id             String       @id @default(cuid())
+  id             String          @id @default(cuid())
   nome           String
   tipo           TipoCategoria
-  ativo          Boolean      @default(true)
+  ativo          Boolean         @default(true)
   parentId       String?
-  parent         Categoria?   @relation("Subcategorias", fields: [parentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  subcategorias  Categoria[]  @relation("Subcategorias")
-  lancamentos    Lancamento[] @relation("LancamentoCategoria")
-  lancamentosSub Lancamento[] @relation("LancamentoSubcategoria")
+  parent         Categoria?      @relation("Subcategorias", fields: [parentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  subcategorias  Categoria[]     @relation("Subcategorias")
+  lancamentos    Lancamento[]    @relation("LancamentoCategoria")
+  lancamentosSub Lancamento[]    @relation("LancamentoSubcategoria")
   orcamentos     OrcamentoItem[]
 
   @@unique([nome, parentId])
@@ -122,19 +122,27 @@ model OrcamentoItem {
   @@unique([ano, mes, categoriaId])
 }
 
+enum RegimeContaDRE {
+  CAIXA
+  COMPETENCIA
+}
+
 model GrupoDRE {
-  id     String     @id @default(cuid())
-  nome   String     @unique
-  ordem  Int
-  contas ContaDRE[]
+  id                String     @id @default(cuid())
+  nome              String     @unique
+  ordem             Int
+  subtotalLabel     String?
+  mostrarPercentual Boolean    @default(false)
+  contas            ContaDRE[]
 }
 
 model ContaDRE {
-  id          String       @id @default(cuid())
+  id          String         @id @default(cuid())
   nome        String
   ordem       Int
+  regime      RegimeContaDRE @default(COMPETENCIA)
   grupoId     String
-  grupo       GrupoDRE     @relation(fields: [grupoId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  grupo       GrupoDRE       @relation(fields: [grupoId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   lancamentos Lancamento[]
 
   @@unique([nome, grupoId])
@@ -153,6 +161,7 @@ model Cliente {
   id          String       @id @default(cuid())
   nome        String
   documento   String?
+  telefone    String?
   contato     String?
   ativo       Boolean      @default(true)
   regionalId  String?
@@ -164,6 +173,7 @@ model Fornecedor {
   id          String       @id @default(cuid())
   nome        String
   documento   String?
+  telefone    String?
   contato     String?
   ativo       Boolean      @default(true)
   lancamentos Lancamento[]
@@ -229,14 +239,14 @@ model Lancamento {
   id String @id @default(cuid())
 
   // Identificação
-  dataLancamento DateTime
+  dataLancamento  DateTime
   dataCompetencia DateTime
-  dataVencimento DateTime
-  dataPagamento  DateTime?
-  tipo           TipoLancamento
-  natureza       NaturezaLancamento
-  status         StatusLancamento @default(EM_ABERTO)
-  descricao      String
+  dataVencimento  DateTime
+  dataPagamento   DateTime?
+  tipo            TipoLancamento
+  natureza        NaturezaLancamento
+  status          StatusLancamento   @default(EM_ABERTO)
+  descricao       String
 
   // Valores
   valorOriginal Decimal @db.Decimal(14, 2)
@@ -270,9 +280,9 @@ model Lancamento {
   tipoPagamento   String?
 
   // Observações
-  observacao        String?
-  numeroDocumento   String?
-  numeroNotaFiscal  String?
+  observacao       String?
+  numeroDocumento  String?
+  numeroNotaFiscal String?
 
   // Recorrência
   recorrenciaId String?
@@ -296,16 +306,16 @@ model Lancamento {
 // ---------- Anexos ----------
 
 model Anexo {
-  id              String     @id @default(cuid())
-  lancamentoId    String
-  lancamento      Lancamento @relation(fields: [lancamentoId], references: [id], onDelete: Cascade, onUpdate: Restrict)
-  nomeArquivo     String
-  caminhoArquivo  String
-  tamanho         Int
-  tipoMime        String
-  uploadedById    String?
-  uploadedBy      User?      @relation(fields: [uploadedById], references: [id], onDelete: SetNull, onUpdate: Restrict)
-  createdAt       DateTime   @default(now())
+  id             String     @id @default(cuid())
+  lancamentoId   String
+  lancamento     Lancamento @relation(fields: [lancamentoId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  nomeArquivo    String
+  caminhoArquivo String
+  tamanho        Int
+  tipoMime       String
+  uploadedById   String?
+  uploadedBy     User?      @relation(fields: [uploadedById], references: [id], onDelete: SetNull, onUpdate: Restrict)
+  createdAt      DateTime   @default(now())
 
   @@index([lancamentoId])
 }
@@ -314,7 +324,7 @@ model Anexo {
 
 model ConfiguracaoEmpresa {
   id                 String   @id
-  nome               String   @default("Dioxd")
+  nome               String   @default("Dioxd Financeiro")
   cnpj               String?
   endereco           String?
   logoPath           String?

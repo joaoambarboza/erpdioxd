@@ -6,6 +6,8 @@ import { computeValores, lancamentoSchema } from "@/lib/lancamento-schema";
 import { assertMesAberto } from "@/lib/fechamento";
 import { requireRole } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
+import { saveAnexoForLancamento } from "./anexos-actions";
+import { MAX_ANEXO_SIZE, ALLOWED_ANEXO_TYPES } from "@/lib/storage";
 
 export type ActionState = { error?: string; fieldErrors?: Record<string, string> };
 
@@ -37,6 +39,18 @@ export async function createLancamento(
     await assertMesAberto(new Date(data.dataCompetencia));
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível salvar." };
+  }
+
+  const anexosNovos = formData
+    .getAll("anexosNovos")
+    .filter((f): f is File => f instanceof File && f.size > 0);
+  for (const file of anexosNovos) {
+    if (file.size > MAX_ANEXO_SIZE) {
+      return { error: `Arquivo "${file.name}" muito grande. O limite é 10MB.` };
+    }
+    if (!ALLOWED_ANEXO_TYPES.has(file.type)) {
+      return { error: `Arquivo "${file.name}": tipo não permitido. Envie PDF, imagem ou documento do Office.` };
+    }
   }
 
   const { valorFinal, saldoAberto } = computeValores(data);
@@ -76,6 +90,10 @@ export async function createLancamento(
       createdById: session.user.id,
     },
   });
+
+  for (const file of anexosNovos) {
+    await saveAnexoForLancamento(criado.id, file, session.user.id);
+  }
 
   await logAudit({
     userId: session.user.id,

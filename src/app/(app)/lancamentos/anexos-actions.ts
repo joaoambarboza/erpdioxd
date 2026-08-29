@@ -7,6 +7,39 @@ import { saveAnexoFile, deleteAnexoFile, MAX_ANEXO_SIZE, ALLOWED_ANEXO_TYPES } f
 
 export type ActionState = { error?: string };
 
+/** Valida e salva um único arquivo como Anexo de um lançamento já existente. Lança erro em vez de retornar `{error}` — quem chama decide como reportar. */
+export async function saveAnexoForLancamento(
+  lancamentoId: string,
+  file: File,
+  uploadedById: string
+) {
+  if (file.size === 0) throw new Error(`Arquivo "${file.name}" está vazio.`);
+  if (file.size > MAX_ANEXO_SIZE) {
+    throw new Error(`Arquivo "${file.name}" muito grande. O limite é 10MB.`);
+  }
+  if (!ALLOWED_ANEXO_TYPES.has(file.type)) {
+    throw new Error(
+      `Arquivo "${file.name}": tipo não permitido. Envie PDF, imagem ou documento do Office.`
+    );
+  }
+
+  const anexo = await prisma.anexo.create({
+    data: {
+      lancamentoId,
+      nomeArquivo: file.name,
+      caminhoArquivo: "",
+      tamanho: file.size,
+      tipoMime: file.type,
+      uploadedById,
+    },
+  });
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const caminhoArquivo = await saveAnexoFile(lancamentoId, anexo.id, file.name, buffer);
+
+  await prisma.anexo.update({ where: { id: anexo.id }, data: { caminhoArquivo } });
+}
+
 export async function uploadAnexo(
   lancamentoId: string,
   _prevState: ActionState,
@@ -21,35 +54,17 @@ export async function uploadAnexo(
     return { error: "Selecione um arquivo." };
   }
 
-  if (file.size > MAX_ANEXO_SIZE) {
-    return { error: "Arquivo muito grande. O limite é 10MB." };
-  }
-
-  if (!ALLOWED_ANEXO_TYPES.has(file.type)) {
-    return { error: "Tipo de arquivo não permitido. Envie PDF, imagem ou documento do Office." };
-  }
-
   const lancamento = await prisma.lancamento.findUnique({
     where: { id: lancamentoId },
     select: { id: true },
   });
   if (!lancamento) return { error: "Lançamento não encontrado." };
 
-  const anexo = await prisma.anexo.create({
-    data: {
-      lancamentoId,
-      nomeArquivo: file.name,
-      caminhoArquivo: "",
-      tamanho: file.size,
-      tipoMime: file.type,
-      uploadedById: session.user.id,
-    },
-  });
-
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const caminhoArquivo = await saveAnexoFile(lancamentoId, anexo.id, file.name, buffer);
-
-  await prisma.anexo.update({ where: { id: anexo.id }, data: { caminhoArquivo } });
+  try {
+    await saveAnexoForLancamento(lancamentoId, file, session.user.id);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Não foi possível anexar o arquivo." };
+  }
 
   revalidatePath("/lancamentos");
   revalidatePath("/contas-a-receber");

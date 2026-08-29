@@ -68,11 +68,23 @@ function DeleteConfirm({
   );
 }
 
-export function GrupoRowActions({ id, nome, ordem }: { id: string; nome: string; ordem: number }) {
+export function GrupoRowActions({
+  id,
+  nome,
+  ordem,
+  subtotalLabel,
+  mostrarPercentual,
+}: {
+  id: string;
+  nome: string;
+  ordem: number;
+  subtotalLabel: string | null;
+  mostrarPercentual: boolean;
+}) {
   return (
     <div className="flex items-center justify-end gap-1">
       <GrupoDialog
-        initial={{ id, nome, ordem }}
+        initial={{ id, nome, ordem, subtotalLabel, mostrarPercentual }}
         trigger={
           <button type="button" className="rounded-md p-1.5 text-muted hover:bg-background hover:text-foreground" aria-label="Editar">
             <Pencil size={16} />
@@ -89,19 +101,21 @@ export function ContaRowActions({
   nome,
   ordem,
   grupoId,
+  regime,
   grupos,
 }: {
   id: string;
   nome: string;
   ordem: number;
   grupoId: string;
+  regime: "CAIXA" | "COMPETENCIA";
   grupos: { id: string; nome: string }[];
 }) {
   return (
     <div className="flex items-center justify-end gap-1">
       <ContaDialog
         grupos={grupos}
-        initial={{ id, nome, ordem, grupoId }}
+        initial={{ id, nome, ordem, grupoId, regime }}
         trigger={
           <button type="button" className="rounded-md p-1.5 text-muted hover:bg-background hover:text-foreground" aria-label="Editar">
             <Pencil size={16} />

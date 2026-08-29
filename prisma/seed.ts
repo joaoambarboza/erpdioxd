@@ -63,61 +63,109 @@ async function main() {
     )
   );
 
+  // Estrutura real da DRE da Dioxd: regime de caixa e competência misturados
+  // por conta, com 5 checkpoints de subtotal (Receita Líquida, Lucro Bruto,
+  // EBITDA, EBIT, Lucro Líquido do Exercício) — ver GrupoDRE.subtotalLabel.
   const grupoReceita = await prisma.grupoDRE.upsert({
-    where: { nome: "Receita Bruta" },
+    where: { nome: "Receita Operacional Bruta" },
     update: {},
-    create: { nome: "Receita Bruta", ordem: 1 },
+    create: { nome: "Receita Operacional Bruta", ordem: 1 },
   });
-  const grupoDeducoes = await prisma.grupoDRE.upsert({
-    where: { nome: "Deduções" },
+  const grupoImpostos = await prisma.grupoDRE.upsert({
+    where: { nome: "Impostos sobre Vendas" },
     update: {},
-    create: { nome: "Deduções", ordem: 2 },
+    create: { nome: "Impostos sobre Vendas", ordem: 2, subtotalLabel: "Receita Líquida" },
   });
-  const grupoCustos = await prisma.grupoDRE.upsert({
-    where: { nome: "Custos" },
+  const grupoCustosComissao = await prisma.grupoDRE.upsert({
+    where: { nome: "Custos de Serviços Prestados e Comissão" },
     update: {},
-    create: { nome: "Custos", ordem: 3 },
+    create: {
+      nome: "Custos de Serviços Prestados e Comissão",
+      ordem: 3,
+      subtotalLabel: "Lucro Bruto",
+      mostrarPercentual: true,
+    },
   });
   const grupoDespesas = await prisma.grupoDRE.upsert({
-    where: { nome: "Despesas Operacionais" },
+    where: { nome: "Despesas" },
     update: {},
-    create: { nome: "Despesas Operacionais", ordem: 4 },
+    create: { nome: "Despesas", ordem: 4, subtotalLabel: "EBITDA", mostrarPercentual: true },
+  });
+  const grupoDepreciacao = await prisma.grupoDRE.upsert({
+    where: { nome: "Depreciação e Amortização" },
+    update: {},
+    create: { nome: "Depreciação e Amortização", ordem: 5, subtotalLabel: "EBIT", mostrarPercentual: true },
+  });
+  const grupoReceitasFinanceiras = await prisma.grupoDRE.upsert({
+    where: { nome: "Receitas Financeiras" },
+    update: {},
+    create: { nome: "Receitas Financeiras", ordem: 6 },
+  });
+  const grupoDespesasFinanceiras = await prisma.grupoDRE.upsert({
+    where: { nome: "Despesas Financeiras" },
+    update: {},
+    create: {
+      nome: "Despesas Financeiras",
+      ordem: 7,
+      subtotalLabel: "Lucro Líquido do Exercício",
+      mostrarPercentual: true,
+    },
   });
 
   const contaDreVendas = await prisma.contaDRE.upsert({
     where: { nome_grupoId: { nome: "Venda de Grãos", grupoId: grupoReceita.id } },
     update: {},
-    create: { nome: "Venda de Grãos", ordem: 1, grupoId: grupoReceita.id },
+    create: { nome: "Venda de Grãos", ordem: 1, grupoId: grupoReceita.id, regime: "COMPETENCIA" },
   });
   await prisma.contaDRE.upsert({
-    where: { nome_grupoId: { nome: "Impostos sobre Vendas", grupoId: grupoDeducoes.id } },
+    where: { nome_grupoId: { nome: "Impostos sobre Vendas", grupoId: grupoImpostos.id } },
     update: {},
-    create: { nome: "Impostos sobre Vendas", ordem: 1, grupoId: grupoDeducoes.id },
+    create: { nome: "Impostos sobre Vendas", ordem: 1, grupoId: grupoImpostos.id, regime: "COMPETENCIA" },
   });
   const contaDreInsumos = await prisma.contaDRE.upsert({
-    where: { nome_grupoId: { nome: "Insumos Agrícolas", grupoId: grupoCustos.id } },
+    where: { nome_grupoId: { nome: "Insumos Agrícolas", grupoId: grupoCustosComissao.id } },
     update: {},
-    create: { nome: "Insumos Agrícolas", ordem: 1, grupoId: grupoCustos.id },
+    create: { nome: "Insumos Agrícolas", ordem: 1, grupoId: grupoCustosComissao.id, regime: "CAIXA" },
+  });
+  const contaDreFrete = await prisma.contaDRE.upsert({
+    where: { nome_grupoId: { nome: "Frete e Logística", grupoId: grupoCustosComissao.id } },
+    update: {},
+    create: { nome: "Frete e Logística", ordem: 2, grupoId: grupoCustosComissao.id, regime: "CAIXA" },
+  });
+  const contaDreComissao = await prisma.contaDRE.upsert({
+    where: { nome_grupoId: { nome: "Comissão", grupoId: grupoCustosComissao.id } },
+    update: {},
+    create: { nome: "Comissão", ordem: 3, grupoId: grupoCustosComissao.id, regime: "COMPETENCIA" },
   });
   const contaDreMaoDeObra = await prisma.contaDRE.upsert({
-    where: { nome_grupoId: { nome: "Mão de Obra", grupoId: grupoCustos.id } },
+    where: { nome_grupoId: { nome: "Mão de Obra", grupoId: grupoDespesas.id } },
     update: {},
-    create: { nome: "Mão de Obra", ordem: 2, grupoId: grupoCustos.id },
+    create: { nome: "Mão de Obra", ordem: 1, grupoId: grupoDespesas.id, regime: "CAIXA" },
   });
   const contaDreAdmin = await prisma.contaDRE.upsert({
     where: { nome_grupoId: { nome: "Despesas Administrativas", grupoId: grupoDespesas.id } },
     update: {},
-    create: { nome: "Despesas Administrativas", ordem: 1, grupoId: grupoDespesas.id },
+    create: { nome: "Despesas Administrativas", ordem: 2, grupoId: grupoDespesas.id, regime: "CAIXA" },
   });
   const contaDreManutencao = await prisma.contaDRE.upsert({
     where: { nome_grupoId: { nome: "Manutenção de Máquinas", grupoId: grupoDespesas.id } },
     update: {},
-    create: { nome: "Manutenção de Máquinas", ordem: 2, grupoId: grupoDespesas.id },
+    create: { nome: "Manutenção de Máquinas", ordem: 3, grupoId: grupoDespesas.id, regime: "CAIXA" },
   });
-  const contaDreFrete = await prisma.contaDRE.upsert({
-    where: { nome_grupoId: { nome: "Frete e Logística", grupoId: grupoDespesas.id } },
+  const contaDreDepreciacao = await prisma.contaDRE.upsert({
+    where: { nome_grupoId: { nome: "Depreciação de Equipamentos", grupoId: grupoDepreciacao.id } },
     update: {},
-    create: { nome: "Frete e Logística", ordem: 3, grupoId: grupoDespesas.id },
+    create: { nome: "Depreciação de Equipamentos", ordem: 1, grupoId: grupoDepreciacao.id, regime: "CAIXA" },
+  });
+  const contaDreReceitasFinanceiras = await prisma.contaDRE.upsert({
+    where: { nome_grupoId: { nome: "Rendimentos de Aplicação", grupoId: grupoReceitasFinanceiras.id } },
+    update: {},
+    create: { nome: "Rendimentos de Aplicação", ordem: 1, grupoId: grupoReceitasFinanceiras.id, regime: "CAIXA" },
+  });
+  const contaDreDespesasFinanceiras = await prisma.contaDRE.upsert({
+    where: { nome_grupoId: { nome: "Juros e Tarifas Bancárias", grupoId: grupoDespesasFinanceiras.id } },
+    update: {},
+    create: { nome: "Juros e Tarifas Bancárias", ordem: 1, grupoId: grupoDespesasFinanceiras.id, regime: "CAIXA" },
   });
 
   async function upsertRootCategoria(nome: string, tipo: "ENTRADA" | "SAIDA") {
@@ -154,6 +202,10 @@ async function main() {
   const catManutencao = await upsertRootCategoria("Manutenção", "SAIDA");
   const catFrete = await upsertRootCategoria("Frete", "SAIDA");
   const catAdmin = await upsertRootCategoria("Administrativo", "SAIDA");
+  const catComissao = await upsertRootCategoria("Comissões", "SAIDA");
+  const catDepreciacao = await upsertRootCategoria("Depreciação", "SAIDA");
+  const catReceitasFinanceiras = await upsertRootCategoria("Receitas Financeiras", "ENTRADA");
+  const catDespesasFinanceiras = await upsertRootCategoria("Despesas Financeiras", "SAIDA");
 
   const clientesData = [
     { nome: "Cooperativa Agropecuária Vale Verde", regionalId: regionais[0].id },
@@ -223,6 +275,17 @@ async function main() {
     { offsetDays: 35, tipo: "ENTRADA", natureza: "RECEITA", status: "PROJETADO", descricao: "Venda de soja - contrato futuro 2", valor: 133000, categoriaId: catSoja.id, contaDreId: contaDreVendas.id, centroCustoId: centrosCusto[1].id, regionalId: regionais[3].id, clienteId: clientes[3].id, valorPagoFrac: 0 },
     { offsetDays: -50, tipo: "SAIDA", natureza: "DESPESA", status: "PAGO", descricao: "Despesas administrativas - mês anterior", valor: 8900, categoriaId: catAdmin.id, contaDreId: contaDreAdmin.id, centroCustoId: centrosCusto[0].id, regionalId: regionais[0].id, valorPagoFrac: 1 },
     { offsetDays: -90, tipo: "ENTRADA", natureza: "RECEITA", status: "RECEBIDO", descricao: "Venda de soja - safra anterior", valor: 156000, categoriaId: catSoja.id, contaDreId: contaDreVendas.id, centroCustoId: centrosCusto[1].id, regionalId: regionais[0].id, clienteId: clientes[0].id, valorPagoFrac: 1 },
+
+    // Linhas de regime caixa/competência da nova composição de DRE — dados
+    // suficientes para exercitar Lucro Bruto/EBITDA/EBIT/Lucro Líquido tanto
+    // no projetado quanto no realizado.
+    { offsetDays: -12, tipo: "SAIDA", natureza: "DESPESA", status: "PAGO", descricao: "Comissão sobre vendas - safra atual", valor: 8000, categoriaId: catComissao.id, contaDreId: contaDreComissao.id, centroCustoId: centrosCusto[1].id, regionalId: regionais[0].id, valorPagoFrac: 1 },
+    { offsetDays: 18, tipo: "SAIDA", natureza: "DESPESA", status: "PROJETADO", descricao: "Comissão sobre vendas - previsão", valor: 9500, categoriaId: catComissao.id, contaDreId: contaDreComissao.id, centroCustoId: centrosCusto[1].id, regionalId: regionais[0].id, valorPagoFrac: 0 },
+    { offsetDays: -7, tipo: "SAIDA", natureza: "OUTROS", status: "PAGO", descricao: "Depreciação de equipamentos - trimestre", valor: 12000, categoriaId: catDepreciacao.id, contaDreId: contaDreDepreciacao.id, centroCustoId: centrosCusto[2].id, regionalId: regionais[0].id, valorPagoFrac: 1 },
+    { offsetDays: 22, tipo: "SAIDA", natureza: "OUTROS", status: "PROJETADO", descricao: "Depreciação de equipamentos - previsão", valor: 12000, categoriaId: catDepreciacao.id, contaDreId: contaDreDepreciacao.id, centroCustoId: centrosCusto[2].id, regionalId: regionais[0].id, valorPagoFrac: 0 },
+    { offsetDays: -6, tipo: "ENTRADA", natureza: "RECEITA", status: "RECEBIDO", descricao: "Rendimento de aplicação financeira", valor: 3200, categoriaId: catReceitasFinanceiras.id, contaDreId: contaDreReceitasFinanceiras.id, centroCustoId: centrosCusto[0].id, regionalId: regionais[0].id, valorPagoFrac: 1 },
+    { offsetDays: -4, tipo: "SAIDA", natureza: "DESPESA", status: "PAGO", descricao: "Tarifas bancárias e IOF", valor: 950, categoriaId: catDespesasFinanceiras.id, contaDreId: contaDreDespesasFinanceiras.id, centroCustoId: centrosCusto[0].id, regionalId: regionais[0].id, valorPagoFrac: 1 },
+    { offsetDays: 28, tipo: "SAIDA", natureza: "DESPESA", status: "PROJETADO", descricao: "Juros de empréstimo - previsão", valor: 2100, categoriaId: catDespesasFinanceiras.id, contaDreId: contaDreDespesasFinanceiras.id, centroCustoId: centrosCusto[0].id, regionalId: regionais[0].id, valorPagoFrac: 0 },
   ];
 
   for (const item of lancamentosSeed) {

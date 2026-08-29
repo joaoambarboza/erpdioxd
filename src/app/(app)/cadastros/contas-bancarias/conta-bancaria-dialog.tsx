@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { FieldGroup, Input, Checkbox } from "@/components/ui/field";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { createContaBancaria, updateContaBancaria, type ActionState } from "./actions";
 
 const initialState: ActionState = {};
@@ -54,13 +55,7 @@ export function ContaBancariaDialog({
             <Input id="banco" name="banco" required defaultValue={initial?.banco} />
           </FieldGroup>
           <FieldGroup label="Saldo inicial" htmlFor="saldoInicial">
-            <Input
-              id="saldoInicial"
-              name="saldoInicial"
-              type="number"
-              step="0.01"
-              defaultValue={initial?.saldoInicial ?? 0}
-            />
+            <CurrencyInput id="saldoInicial" name="saldoInicial" defaultValue={initial?.saldoInicial ?? 0} />
           </FieldGroup>
           <Checkbox name="ativo" defaultChecked={initial?.ativo ?? true} label="Ativo" />
 

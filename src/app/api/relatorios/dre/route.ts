@@ -1,13 +1,14 @@
 import type { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
-import { getPeriodFilter, getDREData } from "@/lib/financials";
-import { getConfiguracao } from "@/lib/configuracao";
+import { getFiscalQuarterFilter, getDREData } from "@/lib/financials";
+import { getConfiguracao, getLogoForExcel } from "@/lib/configuracao";
 import { buildXlsxResponse, type ExcelColumn } from "@/lib/excel";
 
 const columns: ExcelColumn[] = [
   { header: "Grupo", key: "grupo", width: 24 },
   { header: "Conta", key: "conta", width: 28 },
-  { header: "Valor", key: "valor", width: 16, currency: true },
+  { header: "Projetado", key: "projetado", width: 16, currency: true },
+  { header: "Realizado", key: "realizado", width: 16, currency: true },
 ];
 
 export async function GET(request: NextRequest) {
@@ -16,14 +17,25 @@ export async function GET(request: NextRequest) {
 
   const params = Object.fromEntries(request.nextUrl.searchParams.entries());
   const configuracao = await getConfiguracao();
-  const { periodStart, periodEnd, sharedFilter } = getPeriodFilter(params, configuracao.mesInicioAnoFiscal);
-  const { linhasGrupo, resultado } = await getDREData({ where: sharedFilter, periodStart, periodEnd });
+  const { periodStart, periodEnd, sharedFilter } = getFiscalQuarterFilter(params, configuracao.mesInicioAnoFiscal);
+  const { linhasGrupo } = await getDREData({ where: sharedFilter, periodStart, periodEnd });
 
   const rows = linhasGrupo.flatMap((grupo) => [
-    { grupo: grupo.nome, conta: "", valor: grupo.totalGrupo },
-    ...grupo.contas.map((conta) => ({ grupo: grupo.nome, conta: conta.nome, valor: conta.total })),
+    { grupo: grupo.nome, conta: "", projetado: grupo.totalGrupo.projetado, realizado: grupo.totalGrupo.realizado },
+    ...grupo.contas.map((conta) => ({
+      grupo: grupo.nome,
+      conta: conta.nome,
+      projetado: conta.projetado,
+      realizado: conta.realizado,
+    })),
+    {
+      grupo: grupo.subtotalLabel ?? "Resultado parcial",
+      conta: "",
+      projetado: grupo.resultadoParcial.projetado,
+      realizado: grupo.resultadoParcial.realizado,
+    },
   ]);
-  rows.push({ grupo: "Resultado Líquido", conta: "", valor: resultado });
 
-  return buildXlsxResponse("dre.xlsx", "DRE", columns, rows);
+  const logo = await getLogoForExcel();
+  return buildXlsxResponse("dre.xlsx", "DRE", columns, rows, { logo: logo ?? undefined });
 }
