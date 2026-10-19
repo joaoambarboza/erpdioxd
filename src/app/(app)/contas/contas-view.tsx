@@ -3,6 +3,7 @@ import { StatCard } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { getLancamentoOptions, toLancamentoInitial } from "@/lib/lancamento-options";
+import { dataEfetivaPagamento } from "@/lib/relatorio-lancamentos";
 import { LancamentoDialog } from "@/app/(app)/lancamentos/lancamento-dialog";
 import { RegistrarPagamentoDialog } from "./registrar-pagamento-dialog";
 import type { StatusLancamento } from "@/generated/prisma/enums";
@@ -78,6 +79,7 @@ export async function ContasView({ tipo }: { tipo: "ENTRADA" | "SAIDA" }) {
           <thead>
             <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
               <th className="px-4 py-3 font-medium">Vencimento</th>
+              <th className="px-4 py-3 font-medium">{isReceber ? "Recebimento" : "Pagamento"}</th>
               <th className="px-4 py-3 font-medium">Descrição</th>
               <th className="px-4 py-3 font-medium">{contraparteLabel}</th>
               <th className="px-4 py-3 font-medium">Dias</th>
@@ -90,9 +92,13 @@ export async function ContasView({ tipo }: { tipo: "ENTRADA" | "SAIDA" }) {
             {lancamentos.map((l) => {
               const dias = diasEntre(l.dataVencimento, now);
               const saldoAberto = toNum(l.saldoAberto);
+              const efetiva = dataEfetivaPagamento(l);
               return (
                 <tr key={l.id} className="border-b border-border last:border-0 hover:bg-background/50">
                   <td className="px-4 py-3 whitespace-nowrap">{formatDate(l.dataVencimento)}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {efetiva.data ? formatDate(efetiva.data) : <span className="text-muted">{efetiva.texto}</span>}
+                  </td>
                   <td className="px-4 py-3">{l.descricao}</td>
                   <td className="px-4 py-3 text-muted">
                     {l.cliente?.nome ?? l.fornecedor?.nome ?? "—"}
@@ -140,7 +146,7 @@ export async function ContasView({ tipo }: { tipo: "ENTRADA" | "SAIDA" }) {
             })}
             {lancamentos.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-muted">
+                <td colSpan={8} className="px-4 py-10 text-center text-muted">
                   Nenhum lançamento encontrado.
                 </td>
               </tr>

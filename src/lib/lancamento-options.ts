@@ -73,6 +73,8 @@ export function toLancamentoInitial(
     observacao: l.observacao,
     numeroDocumento: l.numeroDocumento,
     numeroNotaFiscal: l.numeroNotaFiscal,
+    recorrenciaId: l.recorrenciaId,
+    parcelaNumero: l.parcelaNumero,
     anexos: (l.anexos ?? []).map((a) => ({ id: a.id, nomeArquivo: a.nomeArquivo, tamanho: a.tamanho })),
   };
 }

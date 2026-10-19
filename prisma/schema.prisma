@@ -231,6 +231,8 @@ model Recorrencia {
   dataInicio  DateTime
   dataFim     DateTime?
   parcelas    Int?
+  // Token gerado no formulário; garante que reenvios da mesma requisição não dupliquem a série.
+  chaveIdempotencia String? @unique
   createdAt   DateTime              @default(now())
   lancamentos Lancamento[]
 }
@@ -287,6 +289,7 @@ model Lancamento {
   // Recorrência
   recorrenciaId String?
   recorrencia   Recorrencia? @relation(fields: [recorrenciaId], references: [id], onDelete: SetNull, onUpdate: Restrict)
+  parcelaNumero Int?
 
   createdById String
   createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Restrict)
@@ -295,6 +298,7 @@ model Lancamento {
 
   anexos Anexo[]
 
+  @@unique([recorrenciaId, parcelaNumero])
   @@index([tipo, status])
   @@index([dataCompetencia])
   @@index([dataVencimento])

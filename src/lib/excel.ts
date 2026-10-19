@@ -5,6 +5,8 @@ export type ExcelColumn = {
   key: string;
   width?: number;
   currency?: boolean;
+  /** Células com `Date` (UTC) formatadas como data dd/mm/aaaa — reconhecidas como data pelo Excel. */
+  date?: boolean;
 };
 
 export async function buildXlsxResponse(
@@ -42,6 +44,11 @@ export async function buildXlsxResponse(
   for (const col of columns) {
     if (col.currency) {
       sheet.getColumn(col.key).numFmt = '"R$" #,##0.00';
+    }
+    if (col.date) {
+      const column = sheet.getColumn(col.key);
+      column.numFmt = "dd/mm/yyyy";
+      column.alignment = { horizontal: "left" };
     }
   }
 

@@ -40,3 +40,21 @@ export function buildRelatorioWhere(
 
   return where;
 }
+
+const STATUS_COM_BAIXA: StatusLancamento[] = ["PAGO", "RECEBIDO", "PARCIAL_PAGO", "PARCIAL_RECEBIDO"];
+
+/**
+ * Data efetiva de pagamento/recebimento exibida nos relatórios e no Excel. É
+ * sempre o campo `dataPagamento` do lançamento (a data da última baixa) — nunca
+ * a data de vencimento. Sem data, `data` é null e `texto` diz por quê, sem
+ * inventar nenhuma data.
+ */
+export function dataEfetivaPagamento(l: { dataPagamento: Date | null; status: StatusLancamento }): {
+  data: Date | null;
+  texto: string;
+} {
+  if (l.dataPagamento) return { data: l.dataPagamento, texto: "" };
+  if (l.status === "CANCELADO") return { data: null, texto: "—" };
+  if (STATUS_COM_BAIXA.includes(l.status)) return { data: null, texto: "Sem data registrada" };
+  return { data: null, texto: "Em aberto" };
+}

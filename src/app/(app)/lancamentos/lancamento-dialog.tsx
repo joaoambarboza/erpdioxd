@@ -5,7 +5,7 @@ import { useActionState } from "react";
 import { Plus } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { FieldGroup, Input, Select, Textarea } from "@/components/ui/field";
+import { Checkbox, FieldGroup, Input, Select, Textarea } from "@/components/ui/field";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import {
   tipoLabels,
@@ -59,6 +59,8 @@ export type LancamentoInitial = {
   observacao: string | null;
   numeroDocumento: string | null;
   numeroNotaFiscal: string | null;
+  recorrenciaId: string | null;
+  parcelaNumero: number | null;
   anexos: { id: string; nomeArquivo: string; tamanho: number }[];
 };
 
@@ -90,6 +92,12 @@ export function LancamentoDialog({
   const [categoriaId, setCategoriaId] = React.useState(
     initial?.categoriaId ?? ""
   );
+  const [recorrente, setRecorrente] = React.useState(false);
+  const [recorrenciaMeses, setRecorrenciaMeses] = React.useState("");
+  const [recorrenciaDia, setRecorrenciaDia] = React.useState("");
+  // Token da requisição de criação: reenvios do mesmo formulário não duplicam a série.
+  // Gerado ao abrir (a cada abertura é uma nova requisição lógica).
+  const [recorrenciaChave, setRecorrenciaChave] = React.useState("");
   const [novosAnexos, setNovosAnexos] = React.useState<File[]>([]);
   const novosAnexosInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -120,7 +128,15 @@ export function LancamentoDialog({
 
   return (
     <>
-      <span onClick={() => setOpen(true)}>
+      <span
+        onClick={() => {
+          setRecorrente(false);
+          setRecorrenciaMeses("");
+          setRecorrenciaDia("");
+          setRecorrenciaChave(crypto.randomUUID());
+          setOpen(true);
+        }}
+      >
         {trigger ?? (
           <Button>
             <Plus size={16} />
@@ -382,6 +398,68 @@ export function LancamentoDialog({
 
           {!isEdit && (
             <section>
+              <h3 className="mb-3 text-sm font-semibold text-muted">Recorrência</h3>
+              <Checkbox
+                label="Lançamento recorrente"
+                name="recorrente"
+                checked={recorrente}
+                onChange={(e) => setRecorrente(e.target.checked)}
+              />
+              {recorrente && (
+                <>
+                  <input type="hidden" name="recorrenciaChave" value={recorrenciaChave} />
+                  <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <FieldGroup label="Quantidade de meses" htmlFor="recorrenciaMeses">
+                      <Input
+                        id="recorrenciaMeses"
+                        name="recorrenciaMeses"
+                        type="number"
+                        inputMode="numeric"
+                        min={2}
+                        max={60}
+                        step={1}
+                        required
+                        value={recorrenciaMeses}
+                        onChange={(e) => setRecorrenciaMeses(e.target.value)}
+                        placeholder="Ex: 12"
+                      />
+                      {fieldError("recorrenciaMeses") && (
+                        <p className="text-xs text-saida">{fieldError("recorrenciaMeses")}</p>
+                      )}
+                    </FieldGroup>
+                    <FieldGroup label="Dia do mês dos próximos vencimentos" htmlFor="recorrenciaDia">
+                      <Input
+                        id="recorrenciaDia"
+                        name="recorrenciaDia"
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        max={31}
+                        step={1}
+                        required
+                        value={recorrenciaDia}
+                        onChange={(e) => setRecorrenciaDia(e.target.value)}
+                        placeholder="Ex: 5"
+                      />
+                      {fieldError("recorrenciaDia") && (
+                        <p className="text-xs text-saida">{fieldError("recorrenciaDia")}</p>
+                      )}
+                    </FieldGroup>
+                  </div>
+                  {fieldError("recorrenciaChave") && (
+                    <p className="mt-1 text-xs text-saida">{fieldError("recorrenciaChave")}</p>
+                  )}
+                  <p className="mt-2 text-xs text-muted">
+                    A quantidade inclui este lançamento (de 2 a 60), que mantém as datas informadas. Os demais são
+                    gerados mês a mês, em aberto, no dia escolhido (em meses mais curtos, no último dia do mês).
+                  </p>
+                </>
+              )}
+            </section>
+          )}
+
+          {!isEdit && (
+            <section>
               <h3 className="mb-3 text-sm font-semibold text-muted">Anexos</h3>
               {novosAnexos.length > 0 && (
                 <ul className="mb-3 flex flex-col gap-2">
@@ -432,6 +510,28 @@ export function LancamentoDialog({
             <p className="rounded-md bg-saida-bg px-3 py-2 text-sm text-saida">
               {state.error}
             </p>
+          )}
+
+          {isEdit && initial?.recorrenciaId && (
+            <fieldset className="rounded-md border border-border px-3 py-2">
+              <legend className="px-1 text-sm font-medium text-foreground">
+                Este lançamento faz parte de uma recorrência
+              </legend>
+              <div className="flex flex-col gap-1.5 sm:flex-row sm:gap-6">
+                <label className="flex items-center gap-2 text-sm text-foreground">
+                  <input type="radio" name="escopo" value="este" defaultChecked />
+                  Aplicar somente a este lançamento
+                </label>
+                <label className="flex items-center gap-2 text-sm text-foreground">
+                  <input type="radio" name="escopo" value="seguintes" />
+                  Aplicar a este e aos seguintes
+                </label>
+              </div>
+              <p className="mt-1 text-xs text-muted">
+                &quot;Este e os seguintes&quot; atualiza classificação e valores dos lançamentos seguintes; datas, status,
+                descrição, documento e NF de cada um não mudam.
+              </p>
+            </fieldset>
           )}
 
           <div className="flex justify-end gap-2">

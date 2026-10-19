@@ -1,14 +1,14 @@
 import type { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { buildRelatorioWhere } from "@/lib/relatorio-lancamentos";
+import { buildRelatorioWhere, dataEfetivaPagamento } from "@/lib/relatorio-lancamentos";
 import { getLogoForExcel } from "@/lib/configuracao";
 import { buildXlsxResponse, type ExcelColumn } from "@/lib/excel";
-import { formatDate } from "@/lib/utils";
 import { tipoLabels, statusLabels } from "@/lib/enum-labels";
 
 const columns: ExcelColumn[] = [
-  { header: "Vencimento", key: "vencimento", width: 14 },
+  { header: "Vencimento", key: "vencimento", width: 14, date: true },
+  { header: "Pagamento/recebimento", key: "dataPagamento", width: 22, date: true },
   { header: "Descrição", key: "descricao", width: 32 },
   { header: "Tipo", key: "tipo", width: 12 },
   { header: "Cliente/Fornecedor", key: "contraparte", width: 28 },
@@ -21,6 +21,11 @@ const columns: ExcelColumn[] = [
   { header: "Valor Final", key: "valorFinal", width: 16, currency: true },
   { header: "Saldo Aberto", key: "saldoAberto", width: 16, currency: true },
 ];
+
+const efetiva = (l: Parameters<typeof dataEfetivaPagamento>[0]) => {
+  const { data, texto } = dataEfetivaPagamento(l);
+  return data ?? texto;
+};
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -36,7 +41,8 @@ export async function GET(request: NextRequest) {
   });
 
   const rows = lancamentos.map((l) => ({
-    vencimento: formatDate(l.dataVencimento),
+    vencimento: l.dataVencimento,
+    dataPagamento: efetiva(l),
     descricao: l.descricao,
     tipo: tipoLabels[l.tipo],
     contraparte: l.cliente?.nome ?? l.fornecedor?.nome ?? "",

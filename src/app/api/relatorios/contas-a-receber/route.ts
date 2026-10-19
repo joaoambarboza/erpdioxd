@@ -2,11 +2,12 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getLogoForExcel } from "@/lib/configuracao";
 import { buildXlsxResponse, type ExcelColumn } from "@/lib/excel";
-import { formatDate } from "@/lib/utils";
+import { dataEfetivaPagamento } from "@/lib/relatorio-lancamentos";
 import { statusLabels } from "@/lib/enum-labels";
 
 const columns: ExcelColumn[] = [
-  { header: "Vencimento", key: "vencimento", width: 14 },
+  { header: "Vencimento", key: "vencimento", width: 14, date: true },
+  { header: "Recebimento", key: "dataPagamento", width: 16, date: true },
   { header: "Descrição", key: "descricao", width: 32 },
   { header: "Cliente", key: "cliente", width: 28 },
   { header: "Documento", key: "documento", width: 20 },
@@ -14,6 +15,11 @@ const columns: ExcelColumn[] = [
   { header: "Status", key: "status", width: 18 },
   { header: "Saldo Aberto", key: "saldoAberto", width: 16, currency: true },
 ];
+
+const efetiva = (l: Parameters<typeof dataEfetivaPagamento>[0]) => {
+  const { data, texto } = dataEfetivaPagamento(l);
+  return data ?? texto;
+};
 
 export async function GET() {
   const session = await auth();
@@ -26,7 +32,8 @@ export async function GET() {
   });
 
   const rows = lancamentos.map((l) => ({
-    vencimento: formatDate(l.dataVencimento),
+    vencimento: l.dataVencimento,
+    dataPagamento: efetiva(l),
     descricao: l.descricao,
     cliente: l.cliente?.nome ?? "",
     documento: l.cliente?.documento ?? "",

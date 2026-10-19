@@ -1,8 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { StatusBadge, TipoBadge } from "@/components/ui/badge";
-import { buildRelatorioWhere } from "@/lib/relatorio-lancamentos";
+import { buildRelatorioWhere, dataEfetivaPagamento } from "@/lib/relatorio-lancamentos";
 import { RelatoriosFilters } from "./filters";
+
+function renderDataEfetiva(l: Parameters<typeof dataEfetivaPagamento>[0]) {
+  const { data, texto } = dataEfetivaPagamento(l);
+  return data ? formatDate(data) : <span className="text-muted">{texto}</span>;
+}
 
 export default async function RelatoriosPage({
   searchParams,
@@ -59,6 +64,7 @@ export default async function RelatoriosPage({
           <thead>
             <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
               <th className="px-4 py-3 font-medium">Vencimento</th>
+              <th className="px-4 py-3 font-medium">Pagamento/recebimento</th>
               <th className="px-4 py-3 font-medium">Descrição</th>
               <th className="px-4 py-3 font-medium">Tipo</th>
               <th className="px-4 py-3 font-medium">Cliente/Fornecedor</th>
@@ -74,6 +80,7 @@ export default async function RelatoriosPage({
             {lancamentos.map((l) => (
               <tr key={l.id} className="border-b border-border last:border-0 hover:bg-background/50">
                 <td className="px-4 py-3 whitespace-nowrap">{formatDate(l.dataVencimento)}</td>
+                <td className="px-4 py-3 whitespace-nowrap">{renderDataEfetiva(l)}</td>
                 <td className="px-4 py-3">{l.descricao}</td>
                 <td className="px-4 py-3">
                   <TipoBadge tipo={l.tipo} />
@@ -95,7 +102,7 @@ export default async function RelatoriosPage({
             ))}
             {lancamentos.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-4 py-10 text-center text-muted">
+                <td colSpan={11} className="px-4 py-10 text-center text-muted">
                   Nenhum lançamento encontrado.
                 </td>
               </tr>

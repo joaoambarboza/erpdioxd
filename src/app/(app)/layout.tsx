@@ -18,7 +18,7 @@ export default async function AppLayout({
         hasLogo={Boolean(configuracao.logoPath)}
         logoVersion={configuracao.updatedAt.getTime().toString()}
       />
-      <div className="flex min-h-screen flex-1 flex-col">
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         <Header />
         <main className="flex-1 bg-background p-4 sm:p-6 lg:p-8">
           {children}
