@@ -106,6 +106,13 @@ crie o segundo usuário pela própria tela de **Usuários**.
 
 ## Atualizando depois de uma mudança no código
 
+**Jeito mais simples (servidor montado por rsync):** na pasta do projeto, no Mac,
+rode `./deploy.sh`. Ele pede confirmação, envia o código (sem tocar no `.env`,
+nos anexos nem no banco) e reconstrói os containers. Requer a chave SSH do
+servidor configurada em `~/.ssh/config`.
+
+Alternativa manual:
+
 ```bash
 git pull            # se estiver usando a opção GitHub
 docker compose up -d --build
