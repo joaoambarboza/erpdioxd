@@ -22,16 +22,7 @@ export async function buildXlsxResponse(
   sheet.columns = columns.map((c) => ({ key: c.key, width: c.width ?? 20 }));
 
   const headerRowNumber = options?.logo ? 4 : 1;
-  if (options?.logo) {
-    // exceljs's bundled Buffer type predates Node's current generic Buffer<ArrayBufferLike> — same runtime value, just a type-def mismatch.
-    const imageId = workbook.addImage({
-      buffer: options.logo.buffer as unknown as NonNullable<ExcelJS.Image["buffer"]>,
-      extension: options.logo.extension,
-    });
-    sheet.addImage(imageId, { tl: { col: 0, row: 0 }, ext: { width: 130, height: 48 } });
-    sheet.getRow(1).height = 24;
-    sheet.getRow(2).height = 24;
-  }
+  if (options?.logo) addLogo(workbook, sheet, options.logo);
 
   const headerRow = sheet.getRow(headerRowNumber);
   headerRow.values = columns.map((c) => c.header);
@@ -52,6 +43,26 @@ export async function buildXlsxResponse(
     }
   }
 
+  return xlsxResponse(workbook, filename);
+}
+
+/** Logo da empresa nas linhas 1–3 da planilha (a tabela começa na linha 4). */
+export function addLogo(
+  workbook: ExcelJS.Workbook,
+  sheet: ExcelJS.Worksheet,
+  logo: { buffer: Buffer; extension: "png" | "jpeg" }
+) {
+  // exceljs's bundled Buffer type predates Node's current generic Buffer<ArrayBufferLike> — same runtime value, just a type-def mismatch.
+  const imageId = workbook.addImage({
+    buffer: logo.buffer as unknown as NonNullable<ExcelJS.Image["buffer"]>,
+    extension: logo.extension,
+  });
+  sheet.addImage(imageId, { tl: { col: 0, row: 0 }, ext: { width: 130, height: 48 } });
+  sheet.getRow(1).height = 24;
+  sheet.getRow(2).height = 24;
+}
+
+export async function xlsxResponse(workbook: ExcelJS.Workbook, filename: string): Promise<Response> {
   const buffer = await workbook.xlsx.writeBuffer();
 
   return new Response(buffer, {

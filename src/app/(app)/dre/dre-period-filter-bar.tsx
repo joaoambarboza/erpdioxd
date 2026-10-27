@@ -3,17 +3,11 @@
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Select } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
+import { CheckboxFilter } from "@/components/filters/checkbox-filter";
 import { formatAnoFiscal } from "@/lib/utils";
+import { DRE_PERIODOS, labelPeriodo } from "@/lib/dre";
 
 type Option = { id: string; nome: string };
-
-const monthShort = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-
-function trimestreLabel(trimestre: number, mesInicioAnoFiscal: number) {
-  const startIdx = (mesInicioAnoFiscal - 1 + (trimestre - 1) * 3) % 12;
-  const meses = [0, 1, 2].map((offset) => monthShort[(startIdx + offset) % 12]);
-  return `T${trimestre} (${meses.join("-")})`;
-}
 
 export function DrePeriodFilterBar({
   regionais,
@@ -44,19 +38,12 @@ export function DrePeriodFilterBar({
 
   return (
     <div className="mb-6 flex flex-wrap items-end gap-3">
-      <div className="w-48">
-        <Select
-          defaultValue={searchParams.get("trimestre") ?? ""}
-          onChange={(e) => setParam("trimestre", e.target.value)}
-        >
-          <option value="">Ano fiscal inteiro</option>
-          {[1, 2, 3, 4].map((t) => (
-            <option key={t} value={t}>
-              {trimestreLabel(t, mesInicioAnoFiscal)}
-            </option>
-          ))}
-        </Select>
-      </div>
+      <CheckboxFilter
+        label="Períodos"
+        param="periodos"
+        vazioSignificaTudo
+        options={DRE_PERIODOS.map((p) => ({ value: p, label: labelPeriodo(p, mesInicioAnoFiscal) }))}
+      />
       <div className="w-32">
         <Select
           defaultValue={searchParams.get("ano") ?? ""}

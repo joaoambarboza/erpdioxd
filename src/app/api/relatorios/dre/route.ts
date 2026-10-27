@@ -1,15 +1,8 @@
 import type { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
-import { getFiscalQuarterFilter, getDREData } from "@/lib/financials";
+import { getDreFilter, getDREPeriodos } from "@/lib/financials";
 import { getConfiguracao, getLogoForExcel } from "@/lib/configuracao";
-import { buildXlsxResponse, type ExcelColumn } from "@/lib/excel";
-
-const columns: ExcelColumn[] = [
-  { header: "Grupo", key: "grupo", width: 24 },
-  { header: "Conta", key: "conta", width: 28 },
-  { header: "Projetado", key: "projetado", width: 16, currency: true },
-  { header: "Realizado", key: "realizado", width: 16, currency: true },
-];
+import { buildDreXlsxResponse } from "@/lib/dre-excel";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -17,25 +10,18 @@ export async function GET(request: NextRequest) {
 
   const params = Object.fromEntries(request.nextUrl.searchParams.entries());
   const configuracao = await getConfiguracao();
-  const { periodStart, periodEnd, sharedFilter } = getFiscalQuarterFilter(params, configuracao.mesInicioAnoFiscal);
-  const { linhasGrupo } = await getDREData({ where: sharedFilter, periodStart, periodEnd });
-
-  const rows = linhasGrupo.flatMap((grupo) => [
-    { grupo: grupo.nome, conta: "", projetado: grupo.totalGrupo.projetado, realizado: grupo.totalGrupo.realizado },
-    ...grupo.contas.map((conta) => ({
-      grupo: grupo.nome,
-      conta: conta.nome,
-      projetado: conta.projetado,
-      realizado: conta.realizado,
-    })),
-    {
-      grupo: grupo.subtotalLabel ?? "Resultado parcial",
-      conta: "",
-      projetado: grupo.resultadoParcial.projetado,
-      realizado: grupo.resultadoParcial.realizado,
-    },
-  ]);
+  const { ano, sharedFilter } = getDreFilter(params);
+  const dre = await getDREPeriodos({
+    where: sharedFilter,
+    ano,
+    mesInicioAnoFiscal: configuracao.mesInicioAnoFiscal,
+  });
 
   const logo = await getLogoForExcel();
-  return buildXlsxResponse("dre.xlsx", "DRE", columns, rows, { logo: logo ?? undefined });
+  return buildDreXlsxResponse({
+    dre,
+    ano,
+    mesInicioAnoFiscal: configuracao.mesInicioAnoFiscal,
+    logo: logo ?? undefined,
+  });
 }

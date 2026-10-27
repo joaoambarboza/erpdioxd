@@ -64,13 +64,14 @@ export function GrupoDialog({
             />
           </FieldGroup>
           <p className="-mt-2 text-xs text-muted">
-            Quando preenchido, a linha &quot;= Resultado parcial&quot; deste grupo passa a
-            mostrar este rótulo em vez do texto genérico.
+            Quando preenchido, o DRE mostra uma linha de subtotal com este rótulo após o grupo. Em branco,
+            a linha não aparece (nem o título, nem o valor). Para a base dos percentuais e da margem líquida,
+            use exatamente &quot;Receita Líquida&quot; em um único grupo.
           </p>
           <Checkbox
             name="mostrarPercentual"
             defaultChecked={initial?.mostrarPercentual ?? false}
-            label="Mostrar percentual sobre a Receita Bruta"
+            label="Mostrar percentual sobre a Receita Líquida"
           />
 
           {state.error && (

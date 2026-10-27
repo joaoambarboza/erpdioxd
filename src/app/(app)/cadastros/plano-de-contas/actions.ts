@@ -5,13 +5,15 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { isRestrictError, RESTRICT_DELETE_MESSAGE } from "@/lib/prisma-errors";
+import { ehReceitaLiquida, padronizarRotuloSubtotal, RECEITA_LIQUIDA_LABEL } from "@/lib/dre";
 
 export type ActionState = { error?: string };
 
 const grupoSchema = z.object({
   nome: z.string().min(1, "Obrigatório"),
   ordem: z.coerce.number().int().min(0),
-  subtotalLabel: z.string().optional(),
+  // Vazio vira null (e limpa o rótulo salvo); "Receita Líquida" é gravado sempre na grafia padrão.
+  subtotalLabel: z.string().nullable().transform(padronizarRotuloSubtotal),
   mostrarPercentual: z.coerce.boolean(),
 });
 
@@ -19,10 +21,22 @@ function parseGrupoForm(formData: FormData) {
   return grupoSchema.safeParse({
     nome: formData.get("nome"),
     ordem: formData.get("ordem") || 0,
-    subtotalLabel: formData.get("subtotalLabel") || undefined,
+    subtotalLabel: (formData.get("subtotalLabel") as string | null) ?? "",
     mostrarPercentual: formData.get("mostrarPercentual") === "on",
   });
 }
+
+/** Só um grupo pode ter o subtotal "Receita Líquida": é a base dos percentuais e da margem. */
+async function receitaLiquidaDuplicada(subtotalLabel: string | null, ignorarId?: string) {
+  if (!ehReceitaLiquida(subtotalLabel)) return false;
+  const outros = await prisma.grupoDRE.findMany({
+    where: { subtotalLabel: { not: null }, ...(ignorarId ? { id: { not: ignorarId } } : {}) },
+    select: { subtotalLabel: true },
+  });
+  return outros.some((g) => ehReceitaLiquida(g.subtotalLabel));
+}
+
+const RECEITA_LIQUIDA_DUPLICADA = `Já existe outro grupo com o subtotal "${RECEITA_LIQUIDA_LABEL}". Só um grupo pode usá-lo.`;
 
 export async function createGrupoDRE(
   _prevState: ActionState,
@@ -33,6 +47,8 @@ export async function createGrupoDRE(
 
   const parsed = parseGrupoForm(formData);
   if (!parsed.success) return { error: "Verifique os campos." };
+
+  if (await receitaLiquidaDuplicada(parsed.data.subtotalLabel)) return { error: RECEITA_LIQUIDA_DUPLICADA };
 
   await prisma.grupoDRE.create({ data: parsed.data });
   revalidatePath("/cadastros/plano-de-contas");
@@ -49,6 +65,8 @@ export async function updateGrupoDRE(
 
   const parsed = parseGrupoForm(formData);
   if (!parsed.success) return { error: "Verifique os campos." };
+
+  if (await receitaLiquidaDuplicada(parsed.data.subtotalLabel, id)) return { error: RECEITA_LIQUIDA_DUPLICADA };
 
   await prisma.grupoDRE.update({ where: { id }, data: parsed.data });
   revalidatePath("/cadastros/plano-de-contas");

@@ -6,17 +6,32 @@ import { getLancamentoOptions, toLancamentoInitial } from "@/lib/lancamento-opti
 import { dataEfetivaPagamento } from "@/lib/relatorio-lancamentos";
 import { LancamentoDialog } from "@/app/(app)/lancamentos/lancamento-dialog";
 import { RegistrarPagamentoDialog } from "./registrar-pagamento-dialog";
+import { ContasMesFilter } from "./contas-mes-filter";
+import { getVencimentoMesesFilter } from "./vencimento-meses";
 import type { StatusLancamento } from "@/generated/prisma/enums";
+import type { Prisma } from "@/generated/prisma/client";
 
 function diasEntre(a: Date, b: Date) {
   return Math.round((a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-export async function ContasView({ tipo }: { tipo: "ENTRADA" | "SAIDA" }) {
+export async function ContasView({
+  tipo,
+  params = {},
+}: {
+  tipo: "ENTRADA" | "SAIDA";
+  params?: Record<string, string | string[] | undefined>;
+}) {
   const isReceber = tipo === "ENTRADA";
   const path = isReceber ? "/contas-a-receber" : "/contas-a-pagar";
   const titulo = isReceber ? "Contas a Receber" : "Contas a Pagar";
   const contraparteLabel = isReceber ? "Cliente" : "Fornecedor";
+
+  // Contas a Pagar lista só o que ainda falta pagar (Em aberto / Projetado), com filtro opcional
+  // de meses de vencimento. Contas a Receber continua listando tudo que não foi cancelado.
+  const filtroLista: Prisma.LancamentoWhereInput = isReceber
+    ? { status: { not: "CANCELADO" } }
+    : { status: { in: ["EM_ABERTO", "PROJETADO"] }, ...getVencimentoMesesFilter(params) };
 
   const now = new Date();
   const em = (dias: number) => new Date(now.getTime() + dias * 24 * 60 * 60 * 1000);
@@ -24,7 +39,7 @@ export async function ContasView({ tipo }: { tipo: "ENTRADA" | "SAIDA" }) {
   const [lancamentos, options, abertoAgg, vencidoAgg, em7Agg, em15Agg, em30Agg, em60Agg] =
     await Promise.all([
       prisma.lancamento.findMany({
-        where: { tipo, status: { not: "CANCELADO" } },
+        where: { tipo, ...filtroLista },
         orderBy: { dataVencimento: "asc" },
         take: 200,
         include: { cliente: true, fornecedor: true, anexos: true },
@@ -64,6 +79,8 @@ export async function ContasView({ tipo }: { tipo: "ENTRADA" | "SAIDA" }) {
         <h1 className="text-xl font-semibold text-foreground">{titulo}</h1>
         <p className="text-sm text-muted">{lancamentos.length} lançamento(s) encontrado(s)</p>
       </div>
+
+      {!isReceber && <ContasMesFilter years={[now.getUTCFullYear() - 1, now.getUTCFullYear(), now.getUTCFullYear() + 1]} />}
 
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard label="Total em aberto" value={formatCurrency(toNum(abertoAgg._sum.saldoAberto))} />

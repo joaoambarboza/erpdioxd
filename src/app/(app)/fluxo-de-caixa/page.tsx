@@ -25,10 +25,11 @@ async function getProjecao(dias: number, saldoAtual: number) {
 export default async function FluxoDeCaixaPage() {
   const saldoAtual = await getSaldoAtual();
 
-  const [projecao30, projecao60, projecao90, fluxoMensal] = await Promise.all([
+  const [projecao30, projecao60, projecao90, projecao180, fluxoMensal] = await Promise.all([
     getProjecao(30, saldoAtual),
     getProjecao(60, saldoAtual),
     getProjecao(90, saldoAtual),
+    getProjecao(180, saldoAtual),
     getFluxoMensal({ monthsBack: 6, monthsForward: 5, saldoAtual }),
   ]);
 
@@ -41,11 +42,12 @@ export default async function FluxoDeCaixaPage() {
         <p className="text-sm text-muted">Saldo atual e projeção de caixa da Dioxd</p>
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Saldo Atual" value={formatCurrency(saldoAtual)} />
+      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <StatCard label="Saldo Atual" value={formatCurrency(saldoAtual)} tone={saldoAtual < 0 ? "negative" : "default"} />
         <StatCard label="Projeção 30 dias" value={formatCurrency(projecao30)} tone={projecao30 >= 0 ? "positive" : "negative"} />
         <StatCard label="Projeção 60 dias" value={formatCurrency(projecao60)} tone={projecao60 >= 0 ? "positive" : "negative"} />
         <StatCard label="Projeção 90 dias" value={formatCurrency(projecao90)} tone={projecao90 >= 0 ? "positive" : "negative"} />
+        <StatCard label="Projeção 180 dias" value={formatCurrency(projecao180)} tone={projecao180 >= 0 ? "positive" : "negative"} />
       </div>
 
       <div className="mb-6">

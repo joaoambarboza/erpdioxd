@@ -1,5 +1,16 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
+import {
+  DRE_TRIMESTRES,
+  intervaloTrimestre,
+  montarDre,
+  somarMapas,
+  somarValores,
+  type DrePeriodoKey,
+  type DreResultado,
+  type DreTotais,
+  type DreValores,
+} from "@/lib/dre";
 
 export const monthLabelsShort = [
   "Jan",
@@ -56,46 +67,26 @@ export function getPeriodFilter(
 }
 
 /**
- * Igual a `getPeriodFilter`, mas para a DRE, que é analisada por trimestre
- * fiscal (não calendário) além de mês/ano. Sem "trimestre" selecionado, cai
- * no comportamento de ano fiscal inteiro de `getPeriodFilter`. Trimestres
- * são relativos ao mês de início do ano fiscal (T1 = mesInicioAnoFiscal,
- * mesInicioAnoFiscal+1, mesInicioAnoFiscal+2 — p.ex. Jul-Ago-Set quando o
- * ano fiscal começa em julho), não Q1-Q4 de calendário.
+ * Filtros da DRE: ano fiscal (`ano`, padrão o ano corrente), regional e
+ * centro de custo. Os períodos (trimestres fiscais e acumulado) não são um
+ * filtro de consulta: a DRE sempre apura os 4 trimestres e a tela escolhe
+ * quais colunas mostrar. Trimestres são relativos ao mês de início do ano
+ * fiscal (T1 = mesInicioAnoFiscal e os dois meses seguintes), não Q1–Q4 de
+ * calendário.
  */
-export function getFiscalQuarterFilter(
-  params: Record<string, string | string[] | undefined>,
-  mesInicioAnoFiscal = 1
-) {
+export function getDreFilter(params: Record<string, string | string[] | undefined>) {
   const now = new Date();
-  const anoFiltro = typeof params.ano === "string" && params.ano ? Number(params.ano) : now.getUTCFullYear();
-  const trimestreFiltro =
-    typeof params.trimestre === "string" && params.trimestre ? Number(params.trimestre) : undefined;
+  const ano = typeof params.ano === "string" && params.ano ? Number(params.ano) : now.getUTCFullYear();
   const regionalId = typeof params.regionalId === "string" && params.regionalId ? params.regionalId : undefined;
   const centroCustoId =
     typeof params.centroCustoId === "string" && params.centroCustoId ? params.centroCustoId : undefined;
-
-  if (!trimestreFiltro) {
-    return {
-      ...getPeriodFilter(
-        { ano: String(anoFiltro), regionalId: params.regionalId, centroCustoId: params.centroCustoId },
-        mesInicioAnoFiscal
-      ),
-      trimestre: undefined as number | undefined,
-      ano: anoFiltro,
-    };
-  }
-
-  const startMonthOffset = (trimestreFiltro - 1) * 3;
-  const periodStart = new Date(Date.UTC(anoFiltro, mesInicioAnoFiscal - 1 + startMonthOffset, 1));
-  const periodEnd = new Date(Date.UTC(anoFiltro, mesInicioAnoFiscal - 1 + startMonthOffset + 3, 1));
 
   const sharedFilter: Prisma.LancamentoWhereInput = {
     ...(regionalId ? { regionalId } : {}),
     ...(centroCustoId ? { centroCustoId } : {}),
   };
 
-  return { periodStart, periodEnd, sharedFilter, regionalId, centroCustoId, trimestre: trimestreFiltro, ano: anoFiltro };
+  return { ano, sharedFilter };
 }
 
 export function sumDecimal(values: { toString(): string }[]) {
@@ -273,169 +264,138 @@ export async function getProjetadoRealizadoMensal({
   return buckets;
 }
 
-export type DreValores = { projetado: number; realizado: number };
+type SomaPorContaTipo = { contaDreId: string; tipo: "ENTRADA" | "SAIDA"; valor: number };
 
-export type DreLinhaGrupo = {
-  id: string;
-  nome: string;
-  subtotalLabel: string | null;
-  mostrarPercentual: boolean;
-  contas: { id: string; nome: string; regime: "CAIXA" | "COMPETENCIA"; projetado: number; realizado: number }[];
-  totalGrupo: DreValores;
-  resultadoParcial: DreValores;
-  percentual: DreValores | null;
-};
-
-type ContaDreGroupByRow = {
-  contaDreId: string;
-  tipo: "ENTRADA" | "SAIDA";
-  _sum: { valorFinal?: Prisma.Decimal | null };
-};
-
-function buildSignedMap(rows: ContaDreGroupByRow[]) {
+function mapaAssinado(rows: SomaPorContaTipo[]) {
   const map = new Map<string, number>();
   for (const row of rows) {
-    const valor = toNum(row._sum.valorFinal);
-    const signed = row.tipo === "ENTRADA" ? valor : -valor;
-    map.set(row.contaDreId, (map.get(row.contaDreId) ?? 0) + signed);
+    map.set(row.contaDreId, (map.get(row.contaDreId) ?? 0) + (row.tipo === "ENTRADA" ? row.valor : -row.valor));
   }
   return map;
 }
 
-function mergeSumMaps(a: Map<string, number>, b: Map<string, number>) {
-  const merged = new Map(a);
-  for (const [key, value] of b) merged.set(key, (merged.get(key) ?? 0) + value);
-  return merged;
-}
-
-function sumByTipo(rows: ContaDreGroupByRow[], tipo: "ENTRADA" | "SAIDA") {
-  return rows.filter((r) => r.tipo === tipo).reduce((acc, r) => acc + toNum(r._sum.valorFinal), 0);
+function somaPorTipo(rows: SomaPorContaTipo[], tipo: "ENTRADA" | "SAIDA") {
+  return rows.filter((r) => r.tipo === tipo).reduce((acc, r) => acc + r.valor, 0);
 }
 
 /**
+ * Valores da DRE num intervalo [periodStart, periodEnd), por conta.
+ *
+ * Realizado = só lançamentos PAGO ou RECEBIDO, somando o campo "Pago/recebido"
+ * (`valorPago`). Projetado = só lançamentos PROJETADO, pelo `valorFinal`.
+ *
  * A DRE da Dioxd mistura regime de caixa e de competência por conta (ver
  * `ContaDRE.regime`): contas de competência são apuradas por `dataCompetencia`
  * (mês da venda/despesa, independente de quando o dinheiro se move); contas de
- * caixa são apuradas por `dataPagamento` (só contam quando efetivamente pago —
- * por isso um lançamento PROJETADO de regime caixa, que ainda não tem
- * `dataPagamento`, é projetado pela `dataVencimento`, a única data que faz
- * sentido como "quando esperamos que o caixa se mova").
+ * caixa são apuradas por `dataPagamento` no realizado — por isso um lançamento
+ * PROJETADO de regime caixa, que ainda não tem `dataPagamento`, é projetado
+ * pela `dataVencimento`, a única data que faz sentido como "quando esperamos
+ * que o caixa se mova".
  */
-export async function getDREData({
-  where = {},
+async function getValoresPeriodo({
+  where,
   periodStart,
   periodEnd,
 }: {
-  where?: Prisma.LancamentoWhereInput;
+  where: Prisma.LancamentoWhereInput;
   periodStart: Date;
   periodEnd: Date;
-}) {
-  const [compRealizado, compProjetado, caixaRealizado, caixaProjetado, grupos] = await Promise.all([
-    prisma.lancamento.groupBy({
+}): Promise<{ valores: Map<string, DreValores>; totais: DreTotais }> {
+  const intervalo = { gte: periodStart, lt: periodEnd };
+
+  const realizado = async (regime: "COMPETENCIA" | "CAIXA") => {
+    const rows = await prisma.lancamento.groupBy({
       by: ["contaDreId", "tipo"],
-      _sum: { valorFinal: true },
+      _sum: { valorPago: true },
       where: {
         ...where,
-        contaDre: { regime: "COMPETENCIA" },
-        status: { notIn: ["PROJETADO", "CANCELADO"] },
-        dataCompetencia: { gte: periodStart, lt: periodEnd },
+        contaDre: { regime },
+        status: { in: ["PAGO", "RECEBIDO"] },
+        ...(regime === "COMPETENCIA" ? { dataCompetencia: intervalo } : { dataPagamento: intervalo }),
       },
-    }),
-    prisma.lancamento.groupBy({
+    });
+    return rows.map((r) => ({ contaDreId: r.contaDreId, tipo: r.tipo, valor: toNum(r._sum.valorPago) }));
+  };
+
+  const projetado = async (regime: "COMPETENCIA" | "CAIXA") => {
+    const rows = await prisma.lancamento.groupBy({
       by: ["contaDreId", "tipo"],
       _sum: { valorFinal: true },
       where: {
         ...where,
-        contaDre: { regime: "COMPETENCIA" },
+        contaDre: { regime },
         status: "PROJETADO",
-        dataCompetencia: { gte: periodStart, lt: periodEnd },
+        ...(regime === "COMPETENCIA" ? { dataCompetencia: intervalo } : { dataVencimento: intervalo }),
       },
-    }),
-    prisma.lancamento.groupBy({
-      by: ["contaDreId", "tipo"],
-      _sum: { valorFinal: true },
-      where: {
-        ...where,
-        contaDre: { regime: "CAIXA" },
-        status: { notIn: ["PROJETADO", "CANCELADO"] },
-        dataPagamento: { gte: periodStart, lt: periodEnd },
+    });
+    return rows.map((r) => ({ contaDreId: r.contaDreId, tipo: r.tipo, valor: toNum(r._sum.valorFinal) }));
+  };
+
+  const [compReal, caixaReal, compProj, caixaProj] = await Promise.all([
+    realizado("COMPETENCIA"),
+    realizado("CAIXA"),
+    projetado("COMPETENCIA"),
+    projetado("CAIXA"),
+  ]);
+  const linhasRealizado = [...compReal, ...caixaReal];
+  const linhasProjetado = [...compProj, ...caixaProj];
+
+  const realizadoMap = mapaAssinado(linhasRealizado);
+  const projetadoMap = mapaAssinado(linhasProjetado);
+  const valores = new Map<string, DreValores>();
+  for (const id of new Set([...realizadoMap.keys(), ...projetadoMap.keys()])) {
+    valores.set(id, { projetado: projetadoMap.get(id) ?? 0, realizado: realizadoMap.get(id) ?? 0 });
+  }
+
+  return {
+    valores,
+    totais: {
+      receita: {
+        projetado: somaPorTipo(linhasProjetado, "ENTRADA"),
+        realizado: somaPorTipo(linhasRealizado, "ENTRADA"),
       },
-    }),
-    prisma.lancamento.groupBy({
-      by: ["contaDreId", "tipo"],
-      _sum: { valorFinal: true },
-      where: {
-        ...where,
-        contaDre: { regime: "CAIXA" },
-        status: "PROJETADO",
-        dataVencimento: { gte: periodStart, lt: periodEnd },
+      despesas: {
+        projetado: somaPorTipo(linhasProjetado, "SAIDA"),
+        realizado: somaPorTipo(linhasRealizado, "SAIDA"),
       },
-    }),
+    },
+  };
+}
+
+/**
+ * DRE completa do ano fiscal `ano`: um resultado por trimestre fiscal (T1–T4)
+ * e o acumulado do ano fiscal (soma dos 4 trimestres, que cobrem o ano sem
+ * sobreposição).
+ */
+export async function getDREPeriodos({
+  where = {},
+  ano,
+  mesInicioAnoFiscal,
+}: {
+  where?: Prisma.LancamentoWhereInput;
+  ano: number;
+  mesInicioAnoFiscal: number;
+}): Promise<Record<DrePeriodoKey, DreResultado>> {
+  const [grupos, trimestres] = await Promise.all([
     prisma.grupoDRE.findMany({
       orderBy: { ordem: "asc" },
       include: { contas: { orderBy: { ordem: "asc" } } },
     }),
+    Promise.all(
+      DRE_TRIMESTRES.map((_, i) =>
+        getValoresPeriodo({ where, ...intervaloTrimestre(ano, i + 1, mesInicioAnoFiscal) })
+      )
+    ),
   ]);
 
-  const realizadoMap = mergeSumMaps(buildSignedMap(compRealizado), buildSignedMap(caixaRealizado));
-  const projetadoMap = mergeSumMaps(buildSignedMap(compProjetado), buildSignedMap(caixaProjetado));
+  const resultado = {} as Record<DrePeriodoKey, DreResultado>;
+  DRE_TRIMESTRES.forEach((key, i) => {
+    resultado[key] = montarDre(grupos, trimestres[i].valores, trimestres[i].totais);
+  });
+  resultado.ACUM = montarDre(grupos, somarMapas(trimestres.map((t) => t.valores)), {
+    receita: trimestres.map((t) => t.totais.receita).reduce(somarValores),
+    despesas: trimestres.map((t) => t.totais.despesas).reduce(somarValores),
+  });
 
-  const linhasGrupo = grupos.reduce<DreLinhaGrupo[]>((linhas, grupo) => {
-    const contas = grupo.contas.map((conta) => ({
-      id: conta.id,
-      nome: conta.nome,
-      regime: conta.regime,
-      projetado: projetadoMap.get(conta.id) ?? 0,
-      realizado: realizadoMap.get(conta.id) ?? 0,
-    }));
-    const totalGrupo: DreValores = {
-      projetado: contas.reduce((acc, c) => acc + c.projetado, 0),
-      realizado: contas.reduce((acc, c) => acc + c.realizado, 0),
-    };
-    const anterior = linhas.at(-1)?.resultadoParcial ?? { projetado: 0, realizado: 0 };
-    linhas.push({
-      id: grupo.id,
-      nome: grupo.nome,
-      subtotalLabel: grupo.subtotalLabel,
-      mostrarPercentual: grupo.mostrarPercentual,
-      contas,
-      totalGrupo,
-      resultadoParcial: {
-        projetado: anterior.projetado + totalGrupo.projetado,
-        realizado: anterior.realizado + totalGrupo.realizado,
-      },
-      percentual: null,
-    });
-    return linhas;
-  }, []);
-
-  const primeiroGrupoTotal = linhasGrupo[0]?.totalGrupo ?? { projetado: 0, realizado: 0 };
-  for (const linha of linhasGrupo) {
-    if (!linha.mostrarPercentual) continue;
-    linha.percentual = {
-      projetado:
-        primeiroGrupoTotal.projetado !== 0 ? (linha.resultadoParcial.projetado / primeiroGrupoTotal.projetado) * 100 : 0,
-      realizado:
-        primeiroGrupoTotal.realizado !== 0 ? (linha.resultadoParcial.realizado / primeiroGrupoTotal.realizado) * 100 : 0,
-    };
-  }
-
-  const receita: DreValores = {
-    projetado: sumByTipo(compProjetado, "ENTRADA") + sumByTipo(caixaProjetado, "ENTRADA"),
-    realizado: sumByTipo(compRealizado, "ENTRADA") + sumByTipo(caixaRealizado, "ENTRADA"),
-  };
-  const despesas: DreValores = {
-    projetado: sumByTipo(compProjetado, "SAIDA") + sumByTipo(caixaProjetado, "SAIDA"),
-    realizado: sumByTipo(compRealizado, "SAIDA") + sumByTipo(caixaRealizado, "SAIDA"),
-  };
-  const resultado: DreValores = {
-    projetado: receita.projetado - despesas.projetado,
-    realizado: receita.realizado - despesas.realizado,
-  };
-  const margem: DreValores = {
-    projetado: receita.projetado > 0 ? (resultado.projetado / receita.projetado) * 100 : 0,
-    realizado: receita.realizado > 0 ? (resultado.realizado / receita.realizado) * 100 : 0,
-  };
-
-  return { linhasGrupo, receita, despesas, resultado, margem };
+  return resultado;
 }
